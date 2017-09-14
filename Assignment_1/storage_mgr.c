@@ -75,6 +75,9 @@ extern RC destroyPageFile (char *fileName){
 	return RC_OK;
 
 }
+	
+	
+/* reading blocks from disc*/	
 
   rc readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage) {
 	  FILE *ReadFile;
