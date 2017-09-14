@@ -7,6 +7,75 @@
 #define FirstBlock 0;
 
 int main () {
+	
+	extern RC createPageFile (char *fileName){
+	
+	FILE *fp = NULL;
+	fp = fopen(filename, "ab+");
+	
+	if(*fp == NULL){
+		return RC_FILE_NOT_FOUND;
+	}
+	
+	SM_PageHandle pages = malloc(PAGE_SIZE * sizeof(char));
+	fwrite(pages, sizeof(char), PAGE_SIZE,fp);
+	
+        int closefile = fclose(fp);
+    
+   	if (closefile == EOF) {
+        	return RC_FILE_NOT_CLOSED;
+    	}
+    
+    	free(pages);
+    
+	return RC_OK;		
+}
+
+
+extern RC openPageFile (char *fileName, SM_FileHandle *fHandle){
+	
+	 FILE *fp = fopen(fileName, "rb+");
+	 
+	 if(*fp == NULL){
+                return RC_FILE_NOT_FOUND;
+         }    	 
+	
+	 //Using fseek() and ftell() to get the length of the file
+	 //Put the pointer to the end of the file 
+	 fseek(fp, OL, SEEK_END);  
+         int fileLength = ftell(fp);  
+
+	 //The num of pages is fileSize / pageSize
+    	 int totalNumPages = fileLength / PAGE_SIZE;
+    
+    	 fHandle->fileName = fileName;
+    	 fHandle->totalNumPages = totalNumPages;
+    	 fHandle->curPagePos = 0;
+    	 fHandle->mgmtInfo = fp;
+    
+	 return RC_OK;
+}
+
+
+extern RC closePageFile (SM_FileHandle *fHandle){
+	
+        if (fclose(fHandle->fileName) == EOF) {
+                return RC_FILE_NOT_CLOSED;
+        }
+	return RC_OK;
+}
+
+	  
+
+extern RC destroyPageFile (char *fileName){
+	
+	if (remove(fileName)!= 0) {
+		return RC_FILE_NOT_DESTROY;
+	}
+	return RC_OK;
+
+}
+
   rc readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage) {
 	  FILE *ReadFile;
 	
