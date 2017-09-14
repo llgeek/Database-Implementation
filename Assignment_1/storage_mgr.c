@@ -107,7 +107,17 @@ RC writeBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage) {
 	}
 
 	/** seek  file pointer*/
-	fileseeker = fseek(fHandle->mgmtInfo, (pageNum + 1))
+	fileseeker = fseek(fHandle->mgmtInfo, (pageNum+1)*PAGE_SIZE*sizeof(char), SEEK_SET); /* seeks file write pointer to the pagenumber given by the user */
+
+    if (fileseeker == 0){
+        fwrite(memPage, sizeof(char), PAGE_SIZE, fHandle->mgmtInfo); /* writes data from the memory block pointed by memPage to the file. */
+        fHandle->curPagePos = pageNum;
+
+        return RC_OK;
+    }
+    else{
+        return RC_WRITE_FAILED;
+    }
 
 }
 
@@ -120,7 +130,7 @@ RC writeBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage) {
  * @return         [description]
  */
 RC writeCurrentBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
-
+	return writeBlock (fHandle->curPagePos, fHandle, memPage); 
 }
 
 
@@ -146,7 +156,15 @@ RC appendEmptyBlock (SM_FileHandle *fHandle) {
  * @return               [description]
  */
 RC ensureCapacity (int numberOfPages, SM_FileHandle *fHandle) {
-
+	if (fHandle->totalNumPages < numberOfPages){
+		 /* calculates number of pages required to meet the required size of the file */
+		int numPages = numberOfPages - fHandle->totalNumPages;
+        int i;
+        for (i=0; i < numPages; i++){
+			appendEmptyBlock(fHandle); /* increases the size of the file to required size by appending required pages. */
+		}
+    }
+    return RC_OK;
 }
 
 
