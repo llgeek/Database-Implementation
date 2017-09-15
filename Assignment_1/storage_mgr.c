@@ -90,75 +90,67 @@ RC destroyPageFile (char *fileName){
 	
 /* reading blocks from disc*/	
 
- RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage) {
-	  FILE *ReadFile;
+
+RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage) {
+	  FILE *ReadFile;
 	
-	  if(!fHandle){
-		  return RC_FILE_NOT_FOUND;
-	  }
+	  if(!fHandle){
+		  return RC_FILE_NOT_FOUND;
+	  }
 	
-	  if (pageNum < 0 || pageNum > fHandle->totalNumPages) {
-		  return RC_NON_EXISTING_PAGE;
-	  }
+	  if (pageNum < 0 || pageNum > fHandle->totalNumPages) {
+		  return RC_NON_EXISTING_PAGE;
+	  }
 	
-	  ReadFile = fopen(fHandle->fileName, "r");
+	  ReadFile = fopen(fHandle->fileName, "r");
 	
-	  if(!ReadFile) {
-		  return RC_FILE_READ_FAILED;
-	  }
+	  if(!ReadFile) {
+		  return RC_FILE_READ_FAILED;
+	  }
 	
-	  else {
+	  else {
 	
-		  if(fseek(ReadFile, (pageNum * PAGE_SIZE), SEEK_SET)) {
-			  fread(memPage, sizeof(char), PAGE_SIZE, ReadFile);
-	  	} 
-		  else {
-			  return RC_READ_NON_EXISTING_PAGE; 
-		  }
+		  if(fseek(ReadFile, (pageNum * PAGE_SIZE), SEEK_SET)) {
+			  fread(memPage, sizeof(char), PAGE_SIZE, ReadFile);
+	  	} 
+		  else {
+			  return RC_READ_NON_EXISTING_PAGE; 
+		  }
 		
-		  fHandle->curPagePos = ftell(ReadFile); 
+		  fHandle->curPagePos = ftell(ReadFile); 
 		
-		  fclose(ReadFile);
-		  return RC_OK;
-	  }
+		  fclose(ReadFile);
+		  return RC_OK;
+	  }
 	
-  }
+  }
 
-  int getBlockPos(SM_FileHandle *fhandle) {
-	  	return(fHandle->curPagePos);
-  }
+  int getBlockPos(SM_FileHandle *fhandle) {
+	  	return(fHandle->curPagePos);
+  }
 
 
- RC readFirstBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
-		
-	  RC =  readBlock(0, fHandle, memPage);
-	  printError(RC);
-	  return RC;
-  }`
+ RC readFirstBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
+	return(readBlock(0, fHandle, memPage));
+  }
 
- RC readPreviousBlock(SM_FileHandle *fHandle, SM_PageHandle memPage) {
+ RC readPreviousBlock(SM_FileHandle *fHandle, SM_PageHandle memPage) {
+	return(readBlock((fHandle->curPagePos - 1), fHandle, memPage));
+  } 
+
+  RC readCurrentBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
+	return(readBlock(fHandle->curPagePos, fHandle, memPage));
+	  
+  }
+  
+  RC readNextBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
 	
-	  RC = readBlock((fHandle->curPagePos - 1), fHandle, memPage);
-	  printError(RC);
-	  return RC;
-  } 
+	return(readBlock((fHandle->curPagePos + 1), fHandle, memPage));
 
-  RC readCurrentBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
-	  RC = readBlock(fHandle->curPagePos, fHandle, memPage);
-	  printError(RC)
-	  return RC;
-  }
+  }
 
-
-  RC readNextBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
-	  return readBlock((fHandle->curPagePos + 1), fHandle, memPage);
-  }
-
-RC readLastBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
-	RC = readBlock((fHandle->totalNumPages-1)), fHandle, memPage);
-	printError(RC);
-	return RC;
- } 
+  RC readLastBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
+	return(readBlock((fHandle->totalNumPages-1)), fHandle, memPage));
 
 
 
