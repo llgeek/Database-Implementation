@@ -1,3 +1,22 @@
 CC=GCC
 CFLAGS=-I
 
+
+dberror.o: dberror.c dberror.h
+	$(CC) -c $< $(CFLAGS)
+
+storage_mgr.o: storage_mgr.c storage_mgr.h dberror.h
+	$(CC) -c $< $(CFLAGS)
+
+test_assign1.o: test_assign1_1.c test_helper.h
+	$(CC) -c $< $(CFLAGS)
+
+test: test_assign1.o storage_mgr.o dberror.o
+	$(CC) -o $@ $^ $(CFLAGS)
+
+clean:
+	rm *.o test
+
+
+
+
