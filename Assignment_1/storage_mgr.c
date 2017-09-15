@@ -5,10 +5,12 @@
 #include <stdio.h>
 
 #define FirstBlock 0;
-
-int main () {
 	
-	extern RC createPageFile (char *fileName){
+void initStorageManager (void) {
+	printf("Hello! Welcome to use our Storage Manager System!\n");
+}	
+
+RC createPageFile (char *fileName){
 	
 	FILE *fp = NULL;
 	fp = fopen(filename, "ab+");
@@ -32,7 +34,7 @@ int main () {
 }
 
 
-extern RC openPageFile (char *fileName, SM_FileHandle *fHandle){
+RC openPageFile (char *fileName, SM_FileHandle *fHandle){
 	
 	 FILE *fp = fopen(fileName, "rb+");
 	 
@@ -57,7 +59,7 @@ extern RC openPageFile (char *fileName, SM_FileHandle *fHandle){
 }
 
 
-extern RC closePageFile (SM_FileHandle *fHandle){
+RC closePageFile (SM_FileHandle *fHandle){
 	
         if (fclose(fHandle->fileName) == EOF) {
                 return RC_FILE_NOT_CLOSED;
@@ -67,7 +69,7 @@ extern RC closePageFile (SM_FileHandle *fHandle){
 
 	  
 
-extern RC destroyPageFile (char *fileName){
+RC destroyPageFile (char *fileName){
 	
 	if (remove(fileName)!= 0) {
 		return RC_FILE_NOT_DESTROY;
@@ -79,7 +81,7 @@ extern RC destroyPageFile (char *fileName){
 	
 /* reading blocks from disc*/	
 
-  rc readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage) {
+ RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage) {
 	  FILE *ReadFile;
 	
 	  if(!fHandle){
@@ -118,14 +120,14 @@ extern RC destroyPageFile (char *fileName){
   }
 
 
-  RC readFirstBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
+ RC readFirstBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
 		
 	  RC =  readBlock(0, fHandle, memPage);
 	  printError(RC);
 	  return RC;
   }
 
-  RC readPreviousBlock(SM_FileHandle *fHandle, SM_PageHandle memPage) {
+ RC readPreviousBlock(SM_FileHandle *fHandle, SM_PageHandle memPage) {
 	
 	  RC = readBlock((fHandle->curPagePos - 1), fHandle, memPage);
 	  printError(RC);
@@ -146,12 +148,11 @@ extern RC destroyPageFile (char *fileName){
 	  return RC;
   }
 
-  RC readLastBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
-	  RC = readBlock((fHandle->totalNumPages-1)), fHandle, memPage);
-	  printError(RC);
-	  return RC;
-  } 
-}
+RC readLastBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
+	RC = readBlock((fHandle->totalNumPages-1)), fHandle, memPage);
+	printError(RC);
+	return RC;
+ } 
 
 
 
