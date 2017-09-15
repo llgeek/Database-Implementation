@@ -64,23 +64,22 @@ RC openPageFile (char *fileName, SM_FileHandle *fHandle){
     fHandle->curPagePos = 0;
     fHandle->mgmtInfo = fp;
     
-    
+
 	return RC_OK;
 }
 
 
 RC closePageFile (SM_FileHandle *fHandle){
-	
-        if (fclose(fHandle->fileName) == EOF) {
-                return RC_FILE_NOT_CLOSED;
-        }
+    if (fclose(fHandle->fileName) == EOF) {
+        return RC_FILE_NOT_CLOSED;
+    }
+    //free(fHandle);
 	return RC_OK;
 }
 
 	  
 
 RC destroyPageFile (char *fileName){
-	
 	if (remove(fileName)!= 0) {
 		return RC_FILE_NOT_DESTROY;
 	}
