@@ -1,0 +1,3 @@
+CC=GCC
+CFLAGS=-I
+
