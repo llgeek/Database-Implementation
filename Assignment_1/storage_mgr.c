@@ -3,8 +3,13 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 
-#define FirstBlock 0;
+#define FirstBlock 0
+
+#define MAXFILENUM 20	//maximum number of files supported to be opened at the same time
+int openedFileList[MAXFILENUM]; //recording the currently opened files
+int currentFilePos = 0;		//current file position in the list
 	
 void initStorageManager (void) {
 	printf("Hello! Welcome to use our Storage Manager System!\n");
@@ -13,22 +18,24 @@ void initStorageManager (void) {
 RC createPageFile (char *fileName){
 	
 	FILE *fp = NULL;
-	fp = fopen(filename, "ab+");
+	SM_PageHandle pages;
+
+	fp = fopen(fileName, "w");
 	
-	if(*fp == NULL){
-		return RC_FILE_NOT_FOUND;
+	if (fp == NULL) {
+		return RC_FILE_CREATION_FAILED ;
 	}
-	
-	SM_PageHandle pages = malloc(PAGE_SIZE * sizeof(char));
-	fwrite(pages, sizeof(char), PAGE_SIZE,fp);
-	
-        int closefile = fclose(fp);
+
+	pages = (SM_PageHandle *) malloc(PAGE_SIZE * sizeof(char));
+	memset(pages, '\0', PAGE_SIZE);		/* intialize the page with '\0' */
+
+	fwrite(pages, sizeof(char), PAGE_SIZE, fp);
     
-   	if (closefile == EOF) {
-        	return RC_FILE_NOT_CLOSED;
-    	}
+   	if (fclose(fp) == EOF) {
+        return RC_FILE_NOT_CLOSED;
+    }
     
-    	free(pages);
+    free(pages);
     
 	return RC_OK;		
 }
@@ -36,26 +43,29 @@ RC createPageFile (char *fileName){
 
 RC openPageFile (char *fileName, SM_FileHandle *fHandle){
 	
-	 FILE *fp = fopen(fileName, "rb+");
-	 
-	 if(*fp == NULL){
-                return RC_FILE_NOT_FOUND;
-         }    	 
-	
+	 FILE *fp = NULL;
+	 int fileLength = 0;
+	 int totalNumPages = 0;
+
+	 if ((fp = fopen(fileName, "r")) == NULL) {
+	 	return RC_FILE_NOT_FOUND;
+	 }
+
 	 //Using fseek() and ftell() to get the length of the file
 	 //Put the pointer to the end of the file 
-	 fseek(fp, OL, SEEK_END);  
-         int fileLength = ftell(fp);  
+	fseek(fp, OL, SEEK_END);  
+    fileLength = ftell(fp);  
 
 	 //The num of pages is fileSize / pageSize
-    	 int totalNumPages = fileLength / PAGE_SIZE;
+   	totalNumPages = floor(fileLength / PAGE_SIZE);
     
-    	 fHandle->fileName = fileName;
-    	 fHandle->totalNumPages = totalNumPages;
-    	 fHandle->curPagePos = 0;
-    	 fHandle->mgmtInfo = fp;
+    fHandle->fileName = fileName;
+    fHandle->totalNumPages = totalNumPages;
+    fHandle->curPagePos = 0;
+    fHandle->mgmtInfo = fp;
     
-	 return RC_OK;
+    
+	return RC_OK;
 }
 
 
@@ -125,7 +135,7 @@ RC destroyPageFile (char *fileName){
 	  RC =  readBlock(0, fHandle, memPage);
 	  printError(RC);
 	  return RC;
-  }
+  }`
 
  RC readPreviousBlock(SM_FileHandle *fHandle, SM_PageHandle memPage) {
 	
@@ -142,10 +152,7 @@ RC destroyPageFile (char *fileName){
 
 
   RC readNextBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
-	
-	  RC = readBlock((fHandle->curPagePos + 1), fHandle, memPage);
-	  printError(RC);
-	  return RC;
+	  return readBlock((fHandle->curPagePos + 1), fHandle, memPage);
   }
 
 RC readLastBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
