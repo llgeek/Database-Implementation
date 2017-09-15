@@ -96,28 +96,23 @@ int main () {
  * @return Error Code         
  */
 RC writeBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage) {
-	int fileseeker = 0;
-
 	/**
 	 *  checks the validity of the pageNum 
 	 *  Whether it's negative or exceed the maximal number of pages for this file 
 	**/
-	if (pageNum <= 0 || pageNum > (fHandle->totalNumPages) ) {
+	if (pageNum < 0 || pageNum >= (fHandle->totalNumPages) ) {
 		return RC_WRITE_FAILED;
 	}
 
-	/** seek  file pointer*/
-	fileseeker = fseek(fHandle->mgmtInfo, (pageNum+1)*PAGE_SIZE*sizeof(char), SEEK_SET); /* seeks file write pointer to the pagenumber given by the user */
-
-    if (fileseeker == 0){
-        fwrite(memPage, sizeof(char), PAGE_SIZE, fHandle->mgmtInfo); /* writes data from the memory block pointed by memPage to the file. */
-        fHandle->curPagePos = pageNum;
-
-        return RC_OK;
-    }
-    else{
-        return RC_WRITE_FAILED;
-    }
+	/* seek location of the file descriptor */
+	if (fseek (fHandle->mgmtInfo, pageNum * PAGE_SIZE, SEEK_SET) != 0) {
+		return RC_WRITE_FAILED;
+	}
+	if (fwrite(memPage, sizeof(char), PAGE_SIZE, fHandle->mgmtInfo) < 0) { /* error exists when writing*/
+		return RC_WRITE_FAILED;
+	}
+		
+	return RC_OK;
 
 }
 
@@ -141,11 +136,19 @@ RC writeCurrentBlock (SM_FileHandle *fHandle, SM_PageHandle memPage) {
  * @return         [description]
  */
 RC appendEmptyBlock (SM_FileHandle *fHandle) {
+	char zeroBuffer[PAGE_SIZE] = {'0'};
 
+	if (fseek (fHandle->mgmtInfo, 0, SEEK_END) != 0) {
+		return RC_FILE_OFFSET_FAILED;
+	}
+	if (fwrite(zeroBuffer, sizeof(char), PAGE_SIZE, fHandle->mgmtInfo) < 0) {
+		return RC_WRITE_FAILED;
+	} else {
+		fHandle->totalNumPages += 1;
+		return RC_OK;
+	}
+	
 }
-
-
-
 
 
 
@@ -156,14 +159,15 @@ RC appendEmptyBlock (SM_FileHandle *fHandle) {
  * @return               [description]
  */
 RC ensureCapacity (int numberOfPages, SM_FileHandle *fHandle) {
-	if (fHandle->totalNumPages < numberOfPages){
-		 /* calculates number of pages required to meet the required size of the file */
-		int numPages = numberOfPages - fHandle->totalNumPages;
-        int i;
-        for (i=0; i < numPages; i++){
-			appendEmptyBlock(fHandle); /* increases the size of the file to required size by appending required pages. */
+	/* number of pages required to increase */
+	int numDiff = fHandle->totalNumPages - numberOfPages;
+	if (numDiff > 0 ) {
+		int i = 0;
+		for (i = 0; i < numDiff; i++) {
+			/* iterate to append one page at end by numDiff times */
+			appendEmptyBlock(fHandle);
 		}
-    }
+	}
     return RC_OK;
 }
 
