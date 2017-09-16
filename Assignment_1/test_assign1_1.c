@@ -76,7 +76,6 @@ testSinglePageContent(void)
 
   // read first page into handle
   TEST_CHECK(readFirstBlock (&fh, ph));
-
   // the page should be empty (zero bytes)
   for (i=0; i < PAGE_SIZE; i++)
     ASSERT_TRUE((ph[i] == 0), "expected zero byte in first page of freshly initialized page");
@@ -88,8 +87,6 @@ testSinglePageContent(void)
   TEST_CHECK(writeBlock (0, &fh, ph));
  printf("first block was empty\n");
   /*New test cases - Begins*/
-  
-  
   TEST_CHECK(appendEmptyBlock(&fh));
   TEST_CHECK(writeCurrentBlock(&fh, ph));
   TEST_CHECK(readBlock(0,&fh, ph));
