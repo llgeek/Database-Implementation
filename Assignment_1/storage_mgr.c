@@ -47,7 +47,7 @@ RC openPageFile (char *fileName, SM_FileHandle *fHandle){
 	 int fileLength = 0;
 	 int totalNumPages = 0;
 
-	 if ((fp = fopen(fileName, "r")) == NULL) {
+	 if ((fp = fopen(fileName, "r+")) == NULL) {
 	 	return RC_FILE_NOT_FOUND;
 	 }
 
@@ -163,19 +163,18 @@ RC writeBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage) {
 	 *  checks the validity of the pageNum 
 	 *  Whether it's negative or exceed the maximal number of pages for this file 
 	**/
-	if (pageNum < 0 || pageNum >= (fHandle->totalNumPages) ) {
+	if (pageNum < 0 || pageNum >= fHandle->totalNumPages ) {
 		return RC_INCOMPATIBLE_BLOCKSIZE;
 	}
 	/* seek location of the file descriptor */
 	if (!fseek (fHandle->mgmtInfo, pageNum * PAGE_SIZE, SEEK_SET)) {
 		fwrite(memPage, sizeof(char), PAGE_SIZE, fHandle->mgmtInfo);
+		fHandle->curPagePos = pageNum;
+		return RC_OK;
 	}
 	else {
 		return RC_WRITE_FAILED;
 	}
-	fHandle->curPagePos = pageNum;
-
-	return RC_OK;
 
 }
 
