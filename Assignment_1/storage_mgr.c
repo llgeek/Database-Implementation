@@ -4,12 +4,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-
-#define FirstBlock 0
-
-#define MAXFILENUM 20	//maximum number of files supported to be opened at the same time
-int openedFileList[MAXFILENUM]; //recording the currently opened files
-int currentFilePos = 0;		//current file position in the list
 	
 void initStorageManager (void) {
 	printf("Hello! Welcome to use our Storage Manager System!\n");
