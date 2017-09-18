@@ -1,9 +1,9 @@
-CC=GCC
-CFLAGS=-I
+CC=gcc
+CFLAGS=-lm
 
 
 test: test_assign1_1.o storage_mgr.o dberror.o
-	$(CC) -o $@ $^ 
+	$(CC) -o $@ $^ $(CFLAGS)
 
 dberror.o: dberror.c dberror.h
 	$(CC) -c $< 
