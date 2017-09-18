@@ -2,7 +2,7 @@ CC=gcc
 CFLAGS=-lm
 
 
-test: test_assign1_1.o storage_mgr.o dberror.o
+test_assign1: test_assign1_1.o storage_mgr.o dberror.o
 	$(CC) -o $@ $^ $(CFLAGS)
 
 dberror.o: dberror.c dberror.h
@@ -15,7 +15,7 @@ test_assign1_1.o: test_assign1_1.c test_helper.h
 	$(CC) -c $<
 
 clean:
-	rm *.o test
+	rm *.o test_assign1
 
 
 
