@@ -80,7 +80,7 @@
 12. readLastBlock:
 	We assign total totalPageNum to pageNum and then call the readBlock function. 
 
-13. wirteBlock:
+13. writeBlock:
 	The design idea here is similar with the designing of readBlock. 
 	(1). First we will test whether the required page of the file exists or not, by comparing whether the numPage is negative or exceeds the maximal number of pages. 
 	(2). Then we use fseek function to move the file pointer to the corresponding position according to pageNum. 
