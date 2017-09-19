@@ -63,13 +63,13 @@
 
 
 7. getBlockPos:
-	Simply return the curPagePos in the fHandle. 
+	Simply return the curPagePos in the fHandle, where curPagePos is the current block where the pointer is pointing to.
 
 8. readFirstBlock:
 	The difference between readBlock and readFirstBlock is the value assigned to pageNum. In this function we can simply assign pageNum with value 0 and then call readBlock funciton we have implemented. and return the return value of readBlock.
 
 9. readPreviousBlock:
-	Similar to readFirstBlock, we only need to assign the pageNum with curPagePos - 1 and then call the readBlock function.
+	Similar to readFirstBlock, we only need to assign the pageNum with curPagePos - 1 and then call the readBlock function, which will read the page block ( discussed in point 6)
 
 10. readCurrentBlock:
 	Here we assign curPagePos to pageNum and then call the readBlock function.
