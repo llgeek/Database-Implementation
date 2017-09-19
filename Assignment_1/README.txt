@@ -23,7 +23,7 @@
  	Run: ./test_assign1
  	Clean: make clean
 
- 	The code has also alreadly put in 'lchen96' folder in the Fourier server. You can directly test the code there as well.
+ 	The code has also alreadly been put in 'lchen96' folder in the Fourier server. You can directly test the code there as well.
 ==============================================================================================
 
 
@@ -35,7 +35,7 @@
 
 * Introduction
 	In this assignment, we implemented all the interfaces listed in the head file (storage_mgr.h). Our program passed all the test cases. We will use stdlib.h, stdio.h, string.h, math.h header files in storage_mgr.c file. We store the POSIX file descriptor in mgmgInfo in SM_FILEhANDLE structure. 
-	Bellow we will introduce our design and implementation ideas for each functions.
+	Bellow we will introduce our design and implementation ideas for each function.
 
 * Design idea and implementations:
 1. initStorageManager:
@@ -96,8 +96,8 @@
 	(3). Lastly, we update the totalPageNum by increasing one.
 
 16. ensureCapacity:
-	1. Firstly we compare the required numberOfPages with the totalPageNum. If totalPageNum is greater, then nothing is needed to do. 
-	2. Otherwise, we simply loop numberOfPages-totalPageNum times and each time call appendEmptyBlock to increase the size of pages to numberOfPages.
+	(1). Firstly we compare the required numberOfPages with the totalPageNum. If totalPageNum is greater, then nothing is needed to do. 
+	(2). Otherwise, we simply loop numberOfPages-totalPageNum times and each time call appendEmptyBlock to increase the size of pages to numberOfPages.
 
 
 
