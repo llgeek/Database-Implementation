@@ -45,7 +45,7 @@
 	To create a page file, we firstly use fopen function to create a new file with the given name. The file size is PAGE_SIZE bytes. We also fill the new file with '\0' bytes. 
 
 3. openPageFile:
-	Two steps are followed here:
+	Two steps are as follows:
 	(1). Open the existing file based on the given filename. If the file does not exist, the function will return RC_FILE_NOT_FOUND. Please note here we will implement both read and write operations over this file, so here we need to use fopen with 'r+' to open this file so that we can update it.
 	(2). If this file is opened successfully, then we assign the file's information into fHandle parameter. The number of total pages is calculated by dividing the file size with PAGE_SIZE, and we use floor function to get the mathematical floor value. 
 
