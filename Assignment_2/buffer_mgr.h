@@ -21,8 +21,8 @@ typedef int PageNumber;
 #define NO_PAGE -1
 
 typedef struct BM_BufferPool {
-  char *pageFile;
-  int numPages;
+  char *pageFile;   //the name of the page file associated with the buffer pool 
+  int numPages;     //the size of the buffer pool
   ReplacementStrategy strategy;
   void *mgmtData; // use this one to store the bookkeeping info your buffer 
                   // manager needs for a buffer pool
