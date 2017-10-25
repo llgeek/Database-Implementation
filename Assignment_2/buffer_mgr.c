@@ -24,7 +24,7 @@ Xiaolin hu
 ********************************************************/
 typedef struct BM_MgmtData { //The bookkeeping info
     
-  	//using a BM_FrameHandle and a SM_FileHandle to store the pages and current file info
+    //using a BM_FrameHandle and a SM_FileHandle to store the pages and current file info
     BM_FrameHandle *frames; //Actually it's an array of frames
     SM_FileHandle *fileHandle;
     
@@ -50,8 +50,8 @@ RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
 		  void *stratData){
 
 
-	//check if the file is OK to open
-	//Using the storge manager
+   //check if the file is OK to open
+   //Using the storge manager
 	SM_FileHandle *fHandle = (SM_FileHandle *)malloc(SM_FileHandle);
 
 	RC ret = openPageFile(pageFileName, fHandle);
