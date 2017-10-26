@@ -53,6 +53,12 @@ RC unpinPage (BM_BufferPool *const bm, BM_PageHandle *const page);
 RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page);
 RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, 
 	    const PageNumber pageNum);
+//added two functions for FIFO and LRU replacement, for simplicity
+RC replacewithFIFO (BM_BufferPool *const bm, BM_PageHandle *const page, 
+    const PageNumber pageNum);
+RC replacewithLRU (BM_BufferPool *const bm, BM_PageHandle *const page, 
+    const PageNumber pageNum);
+
 
 // Statistics Interface
 PageNumber *getFrameContents (BM_BufferPool *const bm);
