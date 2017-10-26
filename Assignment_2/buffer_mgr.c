@@ -273,12 +273,12 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
 		bm->mgmtData->frames[framenum]->used_time = TIMER;
 	} else {	//page is not in frame, need to be loaded
 		
-		int frameNum = -1;
+		int frameNum = -1;	//store the frameNum to be replaced
 		switch (bm->strategy) {
-			case RS_FIFO:
+			case RS_FIFO:		//FIFO strategy to replace
 				frameNum = replacewithFIFO(bm, page, pageNum);
 				break;
-			case RS_LRU:
+			case RS_LRU:		//LRU strategy to replace
 				frameNum = replacewithLRU(bm, page, pageNum);
 				break;
 			default:
@@ -291,12 +291,13 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
 			bm->mgmtData->page2frame[pageNum] = frameNum;	//set the mappings for fast lookup
 			bm->mgmtData->frame2page[frameNum] = pageNum;
 
+			//read the content from disk to the buffer
 			readBlock(pageNum, bm->mgmtData->fileHandle, bm->mgmtData->frames[frameNum]->pgdata->data);
-			bm->mgmtData->frames[frameNum]->pgdata->pageNum = pageNum;
-			bm->mgmtData->frames[frameNum]->fix_count ++;
-			bm->mgmtData->frames[frameNum]->is_dirty = false;
-			bm->mgmtData->frames[frameNum]->load_time = TIMER;
-			bm->mgmtData->frames[frameNum]->used_time = TIMER;
+			bm->mgmtData->frames[frameNum]->pgdata->pageNum = pageNum;	//set pageNum
+			bm->mgmtData->frames[frameNum]->fix_count ++;	//increase the number of using clients
+			bm->mgmtData->frames[frameNum]->is_dirty = false;	//loading page will not make the frame dirty
+			bm->mgmtData->frames[frameNum]->load_time = TIMER;	//set the load time of the frame
+			bm->mgmtData->frames[frameNum]->used_time = TIMER;	//set the used time of the frame
 
 		} else {	//cannot find any frames to be replaced
 			printf("All frames are being used by clients now!");
@@ -304,8 +305,10 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
 		}
 
 	}
+	//increment the number of read times
 	bm->mgmtData->read_times ++;
 
+	//assign the value for pages, with its pageNum and content
 	page->pageNum = pageNum;
 	page->data = malloc(sizeof(char) * PAGE_SIZE);
 	strcpy(page->data, bm->mgmtData->frames[frameNum]->pgdata.data);
@@ -341,9 +344,9 @@ RC markDirty (BM_BufferPool *const bm, BM_PageHandle *const page) {
 	}
 
 	if (bm->mgmtData->frames[page->pageNum]->is_dirty){	//the grame to be marked as dirty is already diry, needs to write back the contents first
-		forcePage(bm, bm->mgmtData->frames[page->pageNum]->pgdata);
+		forcePage(bm, bm->mgmtData->frames[page->pageNum]->pgdata);		//write back the content
 	}
-	bm->mgmtData->frames[page->pageNum]->is_dirty = true;
+	bm->mgmtData->frames[page->pageNum]->is_dirty = true;	//mark the frame as dirty
 	return RC_OK;
 }
 
