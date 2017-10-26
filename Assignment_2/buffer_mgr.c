@@ -1,12 +1,13 @@
 #include <stdio.h>
-#include <strlib.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "buffer_mgr.h"
 #include "storage_mgr.h"
 
-#define RC_BM_PINNED 5
-#define RC_PIN_NOUNUSED	6
-#define RC_RANGE_ERROR 7
+#define RC_BM_PINNED 18
+#define RC_PIN_NOUNUSED	19
+#define RC_RANGE_ERROR 20
 
 #define LARGENUM 1e9
 
@@ -21,7 +22,7 @@ typedef struct BM_FrameHandle{
 	//Modified by Linlin
     // PageNumber pageNum;
     // char *data;
-    BM_PageHandle pgdata;	//page handle, stored the page num and its data in memory
+    BM_PageHandle *pgdata;	//page handle, stored the page num and its data in memory
     
     int fix_count; //starting from 0
     bool is_dirty; //true is dirty, false is clean
@@ -30,7 +31,7 @@ typedef struct BM_FrameHandle{
     int load_time;	//the time this page is loaded to the frame, used in FIFO 
     int used_time;	//the last time this frame is used, used in LRU
     
-} BM_FrameHandle
+} BM_FrameHandle;
 
 /********************************************************
 Define the struct mgmtData
@@ -50,7 +51,7 @@ typedef struct BM_MgmtData { //The bookkeeping info
     int *frame2page;	//an array to store the mapping from frames to page number
 	
 
-} BM_mgmtData;
+} BM_MgmtData;
 
 
 // Buffer Manager Interface Pool Handling
@@ -62,12 +63,14 @@ RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
 		  const int numPages, ReplacementStrategy strategy, 
 		  void *stratData){
 
+	char * filename = (char *)malloc(sizeof(char) * strlen(pageFileName));
+	strcpy(filename, pageFileName);
 
    //check if the file is OK to open
    //Using the storge manager
-	SM_FileHandle *fHandle = (SM_FileHandle *)malloc(SM_FileHandle);
+	SM_FileHandle *fHandle = (SM_FileHandle *)malloc(sizeof(SM_FileHandle));
 
-	RC ret = openPageFile(pageFileName, fHandle);
+	RC ret = openPageFile(filename, fHandle);
 	if (ret != RC_OK) {
 		return ret;
 	}
@@ -81,16 +84,19 @@ RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
         //repeatedly create new memory space to filepage and assign it to the frames
         SM_PageHandle fpage = (SM_PageHandle)malloc(PAGE_SIZE * sizeof(char));
         memset(fpage, '\0', PAGE_SIZE);		/* intialize the page with '\0' */
+        BM_PageHandle *pgdata = (BM_PageHandle *)malloc(sizeof(BM_PageHandle));
         
         //BM_frames[i].pageNum = NO_PAGE;   //at beginning, set all page number to be -1.
         //BM_frames[i].data = fpage;
-        BM_frames[i]->pgdata.pageNum = NO_PAGE;
-        BM_frames[i]->pgdata.data = fpage;
-        BM_frames[i]->fix_count = 0;
-        BM_frames[i]->is_dirty = 0;
+        pgdata->pageNum = NO_PAGE;
+        pgdata->data = fpage;
 
-        load_time = 0;
-        used_time = 0;
+        BM_frames[i].pgdata = pgdata;
+        BM_frames[i].fix_count = 0;
+        BM_frames[i].is_dirty = 0;
+
+        BM_frames[i].load_time = 0;
+        BM_frames[i].used_time = 0;
 
     
     }
@@ -105,17 +111,17 @@ RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
     //initialize mapping array, added by Linlin
     mgmtData->page2frame = (int *) malloc (sizeof(int) * fHandle->totalNumPages);
     for (int i = 0; i < fHandle->totalNumPages; i++) {
-    	mgmtData->page2frame = NO_PAGE;		//initialize with -1 for every page
+    	mgmtData->page2frame[i] = NO_PAGE;		//initialize with -1 for every page
     }
     mgmtData->frame2page = (int *) malloc (sizeof(int) * numPages);
     for (int i = 0; i < numPages; i++) {
-    	mgmtData->frame2page = NO_PAGE;		//initialize with -1 for every frame
+    	mgmtData->frame2page[i] = NO_PAGE;		//initialize with -1 for every frame
     }
     
     bm -> mgmtData = mgmtData;
 
 	//Initial the others
-	bm -> pagefile = pageFileName;
+	bm -> pageFile = filename;
 	bm -> numPages = numPages;
 	bm -> strategy = strategy;
 
@@ -133,13 +139,13 @@ RC shutdownBufferPool(BM_BufferPool *const bm){
     BM_MgmtData *mgmtData = (BM_MgmtData*)bm -> mgmtData; //need casting
     BM_FrameHandle *frames = mgmtData -> frames;
     
-    SM_FileHandle *file = mgmtData -> fileHandle;
+    SM_FileHandle *fHandle = mgmtData -> fileHandle;
     int numPages = bm -> numPages;
     
     //Check if there's any pinned pages
     for(int i=0 ; i<numPages ; i++){
         if(frames[i].fix_count != 0)
-            return RC_BM_PINNED；
+            return RC_BM_PINNED;
     }
     //Force flush pool before destroy
     forceFlushPool(bm);
@@ -150,13 +156,15 @@ RC shutdownBufferPool(BM_BufferPool *const bm){
     free(mgmtData->page2frame);
     free(mgmtData->frame2page);
     for (int i = 0; i < bm->numPages; i ++) {
-    	free(frames[i]->pgdata.data);
+    	free(frames[i].pgdata->data);
+    	free(frames[i].pgdata);
     }
 
     free(frames);
     free(fHandle);
     free(mgmtData);
-    
+    free(bm->pageFile);
+
     return RC_OK;
     
 }
@@ -174,8 +182,8 @@ RC forceFlushPool(BM_BufferPool *const bm){
     
     for(int i=0 ; i<numPages ; i++){
         if(frames[i].fix_count == 0 && frames[i].is_dirty == true){
-            int pageN = frames[i].pgdata.pageNum;
-            SM_PageHandle page = frames[i].pgdata.data;
+            int pageN = frames[i].pgdata->pageNum;
+            SM_PageHandle page = frames[i].pgdata->data;
             writeBlock (pageN, file, page);  //write back the page to file
             frames[i].is_dirty=false;  //reset the dirty flag
             
@@ -218,9 +226,9 @@ int replacewithFIFO (BM_BufferPool *const bm, BM_PageHandle *const page, const P
 	//fail to find any unused frame
 	for (int i = 0; i < bm->numPages; i++) {
 		//iterate the frames, search for the frame with 0 fix_count and smallest load_time value
-		if (mgmtData->frames[i]->fix_count == 0) {	//no other client using this frame
-			if (loadtime > bm->mgmtData->frames[i]->load_time) {	//smaller load_time
-				loadtime = bm->mgmtData->frames[i]->load_time;
+		if (mgmtData->frames[i].fix_count == 0) {	//no other client using this frame
+			if (loadtime > mgmtData->frames[i].load_time) {	//smaller load_time
+				loadtime = mgmtData->frames[i].load_time;
 				frameNum = i;
 			}
 		}
@@ -228,8 +236,8 @@ int replacewithFIFO (BM_BufferPool *const bm, BM_PageHandle *const page, const P
 	if (frameNum == -1) 
 		return -1;		//cannot find a frame with no client using 
 	
-	if (mgmtData->frames[frameNum]->is_dirty)	//dirty, write the contents back
-		forcePage(bm, mgmtData->frames[frameNum]->pgdata);
+	if (mgmtData->frames[frameNum].is_dirty)	//dirty, write the contents back
+		forcePage(bm, mgmtData->frames[frameNum].pgdata);
 		
 	return frameNum;	//return the frameNum to be replaced
 
@@ -256,9 +264,9 @@ RC replacewithLRU (BM_BufferPool *const bm, BM_PageHandle *const page, const Pag
 	//fail to find any unused frame
 	for (int i = 0; i < bm->numPages; i++) {
 		//iterate the frames, search for the frame with 0 fix_count and smallest used_time value
-		if (mgmtData->frames[i]->fix_count == 0) {	//no other client using this frame
-			if (usedtime > mgmtData->frames[i]->used_time) {	//smaller used_time
-				usedtime = mgmtData->frames[i]->used_time;
+		if (mgmtData->frames[i].fix_count == 0) {	//no other client using this frame
+			if (usedtime > mgmtData->frames[i].used_time) {	//smaller used_time
+				usedtime = mgmtData->frames[i].used_time;
 				frameNum = i;
 			}
 		}
@@ -266,9 +274,9 @@ RC replacewithLRU (BM_BufferPool *const bm, BM_PageHandle *const page, const Pag
 	if (frameNum == -1) 
 		return -1;		//cannot find a frame with no client using 
 	
-	if (mgmtData->frames[frameNum]->is_dirty) {	//dirty, write the contents back
-		forcePage(bm, mgmtData->frames[frameNum]->pgdata);
-		mgmtData->frames[frameNum]->is_dirty = false;
+	if (mgmtData->frames[frameNum].is_dirty) {	//dirty, write the contents back
+		forcePage(bm, mgmtData->frames[frameNum].pgdata);
+		mgmtData->frames[frameNum].is_dirty = false;
 	}
 		
 	return frameNum;	//return the frameNum to be replaced
@@ -282,15 +290,14 @@ RC replacewithLRU (BM_BufferPool *const bm, BM_PageHandle *const page, const Pag
  */
 RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const PageNumber pageNum) {
 	BM_MgmtData *mgmtData = (BM_MgmtData *) bm->mgmtData;	//casting the mgmtData
-
-	int framenum = -1;	//store the frameNum to be replaced
+	int frameNum = -1;	//store the frameNum to be replaced
 
 	TIMER++;	//increment the global timer
 	//look up the page2frame array, if it's not NO_PAGE, it means the page has already in the buffer
 	if (mgmtData->page2frame[pageNum] != NO_PAGE) {
 		frameNum = mgmtData->page2frame[pageNum];	//get the frame num storing this page
-		mgmtData->frames[frameNum]->fix_count ++;
-		mgmtData->frames[framenum]->used_time = TIMER;
+		mgmtData->frames[frameNum].fix_count ++;
+		mgmtData->frames[frameNum].used_time = TIMER;
 	} else {	//page is not in frame, need to be loaded
 		switch (bm->strategy) {
 			case RS_FIFO:		//FIFO strategy to replace
@@ -300,7 +307,7 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const PageNumber
 				frameNum = replacewithLRU(bm, page, pageNum);
 				break;
 			default:
-				printf("unrecognizable replace strategy!")
+				printf("unrecognizable replace strategy!");
 				exit(1);
 		}
 
@@ -310,12 +317,12 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const PageNumber
 			mgmtData->frame2page[frameNum] = pageNum;
 
 			//read the content from disk to the buffer
-			readBlock(pageNum, mgmtData->fileHandle, mgmtData->frames[frameNum]->pgdata.data);
-			mgmtData->frames[frameNum]->pgdata.pageNum = pageNum;	//set pageNum
-			mgmtData->frames[frameNum]->fix_count ++;	//increase the number of using clients
-			mgmtData->frames[frameNum]->is_dirty = false;	//loading page will not make the frame dirty
-			mgmtData->frames[frameNum]->load_time = TIMER;	//set the load time of the frame
-			mgmtData->frames[frameNum]->used_time = TIMER;	//set the used time of the frame
+			readBlock(pageNum, mgmtData->fileHandle, mgmtData->frames[frameNum].pgdata->data);
+			mgmtData->frames[frameNum].pgdata->pageNum = pageNum;	//set pageNum
+			mgmtData->frames[frameNum].fix_count ++;	//increase the number of using clients
+			mgmtData->frames[frameNum].is_dirty = false;	//loading page will not make the frame dirty
+			mgmtData->frames[frameNum].load_time = TIMER;	//set the load time of the frame
+			mgmtData->frames[frameNum].used_time = TIMER;	//set the used time of the frame
 
 		} else {	//cannot find any frames to be replaced
 			printf("All frames are being used by clients now!");
@@ -329,7 +336,7 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const PageNumber
 	//assign the value for pages, with its pageNum and content
 	page->pageNum = pageNum;
 	page->data = malloc(sizeof(char) * PAGE_SIZE);
-	strcpy(page->data, mgmtData->frames[frameNum]->pgdata.data);
+	strcpy(page->data, mgmtData->frames[frameNum].pgdata->data);
 
 	return RC_OK;
 
@@ -350,11 +357,11 @@ RC unpinPage (BM_BufferPool *const bm, BM_PageHandle *const page) {
 		return RC_RANGE_ERROR;	//the pageNum is not correct, exceeding the numPages, or negative
 	}
 
-	if (mgmtData->frames[page->pageNum]->is_dirty) {	//the frame is dirty, write the ocntents back
-		forcePage(bm, mgmtData->frames[page->pageNum]->pgdata);	//write back the contents
-		mgmtData->frames[page->pageNum]->is_dirty = false;
+	if (mgmtData->frames[page->pageNum].is_dirty) {	//the frame is dirty, write the ocntents back
+		forcePage(bm, mgmtData->frames[page->pageNum].pgdata);	//write back the contents
+		mgmtData->frames[page->pageNum].is_dirty = false;
 	}
-	mgmtData->frames[page->pageNum]->fix_count --;	//Decrement the fix_count by one
+	mgmtData->frames[page->pageNum].fix_count --;	//Decrement the fix_count by one
 	return RC_OK;
 }
 
@@ -375,11 +382,11 @@ RC markDirty (BM_BufferPool *const bm, BM_PageHandle *const page) {
 		return RC_RANGE_ERROR;		//the pageNum is not correct, exceeding the numPages, or negative
 	}
 
-	if (mgmtData->frames[page->pageNum]->is_dirty){	//the frame to be marked as dirty is already diry, needs to write back the contents first
-		forcePage(bm, mgmtData->frames[page->pageNum]->pgdata);		//write back the content
+	if (mgmtData->frames[page->pageNum].is_dirty){	//the frame to be marked as dirty is already diry, needs to write back the contents first
+		forcePage(bm, mgmtData->frames[page->pageNum].pgdata);		//write back the content
 	}
-	mgmtData->frames[page->pageNum]->is_dirty = true;	//mark the frame as dirty
-	mgmtData->frames[page->pageNum]->used_time = TIMER;	//set used timer as current timer
+	mgmtData->frames[page->pageNum].is_dirty = true;	//mark the frame as dirty
+	mgmtData->frames[page->pageNum].used_time = TIMER;	//set used timer as current timer
 
 	return RC_OK;
 }
@@ -396,9 +403,8 @@ RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page) {
 
 	mgmtData->write_times ++;	//increment the write times by one
 	//write the data in pageNum's frame into the fileHandle, since all info are stored in bm, so directly call writeBlock function
-	return writeBlock(page->pageNum, mgmtData->fileHandle, mgmtData->frames[page->pageNum]->pgdata.data);
+	return writeBlock(page->pageNum, mgmtData->fileHandle, mgmtData->frames[page->pageNum].pgdata->data);
 
 }
 //End Buffer Manager Interface Access Pages
-
 
