@@ -410,6 +410,7 @@ RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page) {
 
 
 
+// Statistics Interface
 PageNumber *getFrameContents (BM_BufferPool *const bm) {
 	return ((BM_MgmtData  *)bm->mgmtData)->frame2page;
 }
@@ -439,11 +440,9 @@ int *getFixCounts (BM_BufferPool *const bm) {
         fix_count[i] = frames[i].fix_count;
 
     }
-	
 	return fix_count;
 }
 
-// Statistics Interface
 
 int getNumReadIO (BM_BufferPool *const bm)
 {
