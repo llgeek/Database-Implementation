@@ -408,3 +408,48 @@ RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page) {
 }
 //End Buffer Manager Interface Access Pages
 
+
+
+PageNumber *getFrameContents (BM_BufferPool *const bm) {
+	return ((BM_MgmtData  *)bm->mgmtData)->frame2page;
+}
+
+bool *getDirtyFlags (BM_BufferPool *const bm)
+{
+	bool *dirtyFlags;
+	BM_FrameHandle  *frames;
+    BM_MgmtData *info = (BM_MgmtData *)bm->mgmtData;
+	frames = info->frames;
+	
+	for(int i=0 ; i<numPages ; i++){
+		dirtyFlags[i] = frames[i].is_dirty;
+    }
+    return dirtyFlags;
+}
+
+
+int *getFixCounts (BM_BufferPool *const bm) {
+	int *fix_count;
+	BM_FrameHandle *frames;
+	BM_MgmtData *info = (BM_MgmtData *)bm->mgmtData;
+	
+	frames = info->frames;
+    
+	for(int i=0 ; i<numPages ; i++){
+        fix_count[i] = frames[i].fix_count;
+
+    }
+	
+	return fix_count;
+}
+
+// Statistics Interface
+
+int getNumReadIO (BM_BufferPool *const bm)
+{
+    return ((BM_MgmtData *)bm->mgmtData)->read_times;
+}
+int getNumWriteIO (BM_BufferPool *const bm)
+{
+    return ((bmInfo *)bm->mgmtData)->write_times;
+}
