@@ -410,12 +410,7 @@ RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page) {
 
 
 
-/* Statistics Interface
-
-**Navneet Goel(ngoel2@hawk.iit.edu)
-**Ankush Verma(averma15@hawk.iit.edu) 
-
-*/
+/**** Statistics Interface ****/
 
 
 PageNumber *getFrameContents (BM_BufferPool *const bm) {
