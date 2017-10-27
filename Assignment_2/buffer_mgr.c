@@ -419,13 +419,13 @@ bool *getDirtyFlags (BM_BufferPool *const bm)
 {
 	bool *dirtyFlags;
 	BM_FrameHandle  *frames;
-    BM_MgmtData *info = (BM_MgmtData *)bm->mgmtData;
+    	BM_MgmtData *info = (BM_MgmtData *)bm->mgmtData;
 	frames = info->frames;
 	
 	for(int i=0 ; i<numPages ; i++){
 		dirtyFlags[i] = frames[i].is_dirty;
-    }
-    return dirtyFlags;
+    	}
+    	return dirtyFlags;
 }
 
 
@@ -437,18 +437,18 @@ int *getFixCounts (BM_BufferPool *const bm) {
 	frames = info->frames;
     
 	for(int i=0 ; i<numPages ; i++){
-        fix_count[i] = frames[i].fix_count;
+       		fix_count[i] = frames[i].fix_count;
 
-    }
+    	}
 	return fix_count;
 }
 
 
 int getNumReadIO (BM_BufferPool *const bm)
 {
-    return ((BM_MgmtData *)bm->mgmtData)->read_times;
+	return ((BM_MgmtData *)bm->mgmtData)->read_times;
 }
 int getNumWriteIO (BM_BufferPool *const bm)
 {
-    return ((bmInfo *)bm->mgmtData)->write_times;
+	return ((bmInfo *)bm->mgmtData)->write_times;
 }
