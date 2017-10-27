@@ -418,30 +418,35 @@ PageNumber *getFrameContents (BM_BufferPool *const bm) {
 bool *getDirtyFlags (BM_BufferPool *const bm)
 {
 	bool *dirtyFlags;
-	BM_FrameHandle  *frames;
-    	BM_MgmtData *info = (BM_MgmtData *)bm->mgmtData;
-	frames = info->frames;
 	int numPages = bm -> numPages;  //declear the numPages
-	
+
+	dirtyFlags = (bool *) malloc (sizeof(bool) * numPages);
+
+	BM_FrameHandle  *frames;
+    BM_MgmtData *info = (BM_MgmtData *)bm->mgmtData;
+	frames = info->frames;
+
 	for(int i=0 ; i<numPages ; i++){
 		dirtyFlags[i] = frames[i].is_dirty;
-    	}
-    	return dirtyFlags;
+    }
+    return dirtyFlags;
 }
 
 
 int *getFixCounts (BM_BufferPool *const bm) {
 	int *fix_count;
+	int numPages = bm -> numPages;  //declear the numPages
+
+	fix_count = (int *) malloc(sizeof(int)*numPages);
+
 	BM_FrameHandle *frames;
 	BM_MgmtData *info = (BM_MgmtData *)bm->mgmtData;
 	
 	frames = info->frames;
-	int numPages = bm -> numPages;  //declear the numPages
     
 	for(int i=0 ; i<numPages ; i++){
-       		fix_count[i] = frames[i].fix_count;
-
-    	}
+       	fix_count[i] = frames[i].fix_count;
+    }
 	return fix_count;
 }
 
