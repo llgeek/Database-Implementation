@@ -417,10 +417,18 @@ RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page) {
 
 
 
-// Statistics Interface
+/**** Statistics Interface ****/
+
+
 PageNumber *getFrameContents (BM_BufferPool *const bm) {
+
+
+	/****return the value of frametopage****/
 	return ((BM_MgmtData  *)bm->mgmtData)->frame2page;
-}
+}//getFrameContents
+
+
+//goes through the list of frames and updates the value of dirtyFlags
 
 bool *getDirtyFlags (BM_BufferPool *const bm)
 {
@@ -437,8 +445,10 @@ bool *getDirtyFlags (BM_BufferPool *const bm)
 		dirtyFlags[i] = frames[i].is_dirty;
     }
     return dirtyFlags;
-}
+}//getDirtyFlags
 
+
+/***goes through the list of Frames and updates tha value of fixedCounts ***/
 
 int *getFixCounts (BM_BufferPool *const bm) {
 	int *fix_count;
@@ -455,14 +465,18 @@ int *getFixCounts (BM_BufferPool *const bm) {
        	fix_count[i] = frames[i].fix_count;
     }
 	return fix_count;
-}
+}//getFixCounts
 
+/** return the value of numRead **/
 
 int getNumReadIO (BM_BufferPool *const bm)
 {
 	return ((BM_MgmtData *)bm->mgmtData)->read_times;
-}
+}//getNumReadIO
+
+/** return the value of numWrite **/
+
 int getNumWriteIO (BM_BufferPool *const bm)
 {
 	return ((BM_MgmtData *)bm->mgmtData)->write_times;
-}
+}//getNumWriteIO
