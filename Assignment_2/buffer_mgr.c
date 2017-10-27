@@ -93,7 +93,7 @@ RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
 
         BM_frames[i].pgdata = pgdata;
         BM_frames[i].fix_count = 0;
-        BM_frames[i].is_dirty = 0;
+        BM_frames[i].is_dirty = false;
 
         BM_frames[i].load_time = 0;
         BM_frames[i].used_time = 0;
@@ -218,15 +218,21 @@ int replacewithFIFO (BM_BufferPool *const bm, BM_PageHandle *const page, const P
 	int loadtime = LARGENUM;
 	BM_MgmtData *mgmtData = (BM_MgmtData *)bm->mgmtData;
 
-	//firstly search whether if there exist one frame with no page in
+	// printf("%d\n", bm->numPages);
+	// for (int i = 0; i < bm->numPages; i++)
+	// 	printf("%d\n", mgmtData->frame2page[i]);
+	// firstly search whether if there exist one frame with no page in
 	for (int i = 0; i < bm->numPages; i++) 
 		if (mgmtData->frame2page[i] == NO_PAGE) {
-			return i;	//find an ununsed frame, return the frame number
+			frameNum = i;
+			return frameNum;	//find an ununsed frame, return the frame number
 		}
 	//fail to find any unused frame
 	for (int i = 0; i < bm->numPages; i++) {
+		printf("%d\n", i);
 		//iterate the frames, search for the frame with 0 fix_count and smallest load_time value
 		if (mgmtData->frames[i].fix_count == 0) {	//no other client using this frame
+
 			if (loadtime > mgmtData->frames[i].load_time) {	//smaller load_time
 				loadtime = mgmtData->frames[i].load_time;
 				frameNum = i;
@@ -311,7 +317,7 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const PageNumber
 				exit(1);
 		}
 
-
+		//printf("%d\n", frameNum);
 		if (frameNum != -1) {	//sucessfully find a frame to be replaced 
 			mgmtData->page2frame[pageNum] = frameNum;	//set the mappings for fast lookup
 			mgmtData->frame2page[frameNum] = pageNum;
@@ -404,6 +410,7 @@ RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page) {
 	mgmtData->write_times ++;	//increment the write times by one
 	//write the data in pageNum's frame into the fileHandle, since all info are stored in bm, so directly call writeBlock function
 	return writeBlock(page->pageNum, mgmtData->fileHandle, mgmtData->frames[page->pageNum].pgdata->data);
+	//return RC_OK;
 
 }
 //End Buffer Manager Interface Access Pages
