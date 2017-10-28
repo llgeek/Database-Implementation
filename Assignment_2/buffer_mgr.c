@@ -7,7 +7,7 @@
 
 #define RC_BM_PINNED 18
 #define RC_PIN_NOUNUSED	19
-#define RC_RANGE_ERROR 20
+#define RC_FRAME_NOT_FIND 20
 
 #define LARGENUM 1e9
 
@@ -47,7 +47,8 @@ typedef struct BM_MgmtData { //The bookkeeping info
     int write_times;  //getNumWriteIO()
 
     //added by Linlin Chen, to maintain a mapping between page number and page frames for fast look-ups
-    int *page2frame;	//an array to store the mapping from page number to frames
+    //a page to frame mapping is not realstic, since the size of pages always change
+    //int *page2frame;	//an array to store the mapping from page number to frames
     int *frame2page;	//an array to store the mapping from frames to page number
 	
 
@@ -108,11 +109,11 @@ RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
     mgmtData -> read_times = 0;
     mgmtData -> write_times =0;
 
-    //initialize mapping array, added by Linlin
-    mgmtData->page2frame = (int *) malloc (sizeof(int) * fHandle->totalNumPages);
-    for (int i = 0; i < fHandle->totalNumPages; i++) {
-    	mgmtData->page2frame[i] = NO_PAGE;		//initialize with -1 for every page
-    }
+    // //initialize mapping array, added by Linlin
+    // mgmtData->page2frame = (int *) malloc (sizeof(int) * fHandle->totalNumPages);
+    // for (int i = 0; i < fHandle->totalNumPages; i++) {
+    // 	mgmtData->page2frame[i] = NO_PAGE;		//initialize with -1 for every page
+    // }
     mgmtData->frame2page = (int *) malloc (sizeof(int) * numPages);
     for (int i = 0; i < numPages; i++) {
     	mgmtData->frame2page[i] = NO_PAGE;		//initialize with -1 for every frame
@@ -153,13 +154,13 @@ RC shutdownBufferPool(BM_BufferPool *const bm){
     //Free the malloc spaces in the Pool
     //
     //add some unfree spaces, by Linlin
-    free(mgmtData->page2frame);
+    // free(mgmtData->page2frame);
     free(mgmtData->frame2page);
     for (int i = 0; i < bm->numPages; i ++) {
     	free(frames[i].pgdata->data);
     	free(frames[i].pgdata);
     }
-
+	closePageFile(fHandle);
     free(frames);
     free(fHandle);
     free(mgmtData);
@@ -229,7 +230,7 @@ int replacewithFIFO (BM_BufferPool *const bm, BM_PageHandle *const page, const P
 		}
 	//fail to find any unused frame
 	for (int i = 0; i < bm->numPages; i++) {
-		printf("%d\n", i);
+		//printf("%d\n", i);
 		//iterate the frames, search for the frame with 0 fix_count and smallest load_time value
 		if (mgmtData->frames[i].fix_count == 0) {	//no other client using this frame
 
@@ -300,11 +301,21 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const PageNumber
 
 	TIMER++;	//increment the global timer
 	//look up the page2frame array, if it's not NO_PAGE, it means the page has already in the buffer
-	if (mgmtData->page2frame[pageNum] != NO_PAGE) {
-		frameNum = mgmtData->page2frame[pageNum];	//get the frame num storing this page
-		mgmtData->frames[frameNum].fix_count ++;
-		mgmtData->frames[frameNum].used_time = TIMER;
-	} else {	//page is not in frame, need to be loaded
+	for (int i = 0; i < bm->numPages; i++) {
+		if (mgmtData->frame2page[i] == pageNum) {
+			frameNum = i;	//get the frame num storing this page
+			mgmtData->frames[frameNum].fix_count ++;
+			mgmtData->frames[frameNum].used_time = TIMER;	
+			break;
+		}
+	}
+
+	// if (mgmtData->page2frame[pageNum] != NO_PAGE) {
+	// 	frameNum = mgmtData->page2frame[pageNum];	//get the frame num storing this page
+	// 	mgmtData->frames[frameNum].fix_count ++;
+	// 	mgmtData->frames[frameNum].used_time = TIMER;
+	// } else {	//page is not in frame, need to be loaded
+	if (frameNum == -1)	 {//page is not in frame, need to be loaded
 		switch (bm->strategy) {
 			case RS_FIFO:		//FIFO strategy to replace
 				frameNum = replacewithFIFO(bm, page, pageNum);
@@ -319,10 +330,12 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const PageNumber
 
 		//printf("%d\n", frameNum);
 		if (frameNum != -1) {	//sucessfully find a frame to be replaced 
-			mgmtData->page2frame[pageNum] = frameNum;	//set the mappings for fast lookup
+			//mgmtData->page2frame[pageNum] = frameNum;	//set the mappings for fast lookup
 			mgmtData->frame2page[frameNum] = pageNum;
 
 			//read the content from disk to the buffer
+			if (mgmtData->fileHandle->totalNumPages <= pageNum) //file contains less pages
+				ensureCapacity(pageNum+1, mgmtData->fileHandle);
 			readBlock(pageNum, mgmtData->fileHandle, mgmtData->frames[frameNum].pgdata->data);
 			mgmtData->frames[frameNum].pgdata->pageNum = pageNum;	//set pageNum
 			mgmtData->frames[frameNum].fix_count ++;	//increase the number of using clients
@@ -357,17 +370,27 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const PageNumber
  */
 RC unpinPage (BM_BufferPool *const bm, BM_PageHandle *const page) {
 	BM_MgmtData *mgmtData = (BM_MgmtData *) bm->mgmtData;		//casting
-
-	if (page->pageNum < 0 || page->pageNum > bm->numPages) {
-		printf("ERROR: exceeding the maximum number of pages!\n");
-		return RC_RANGE_ERROR;	//the pageNum is not correct, exceeding the numPages, or negative
+	int frameNum = -1; 	//used to get the frame number storing this page
+	for (int i = 0; i < bm->numPages; i++) {
+		if (mgmtData->frame2page[i] == page->pageNum) {
+			frameNum = i;
+			break;
+		}
 	}
+	if (frameNum == -1) {
+		printf("Cannot find the frame storing page %d\n", page->pageNum);
+		return RC_FRAME_NOT_FIND;
+	} 
+	// if (page->pageNum < 0 || page->pageNum > bm->numPages) {
+	// 	printf("ERROR: exceeding the maximum number of pages!\n");
+	// 	return RC_RANGE_ERROR;	//the pageNum is not correct, exceeding the numPages, or negative
+	// }
 
-	if (mgmtData->frames[page->pageNum].is_dirty) {	//the frame is dirty, write the ocntents back
-		forcePage(bm, mgmtData->frames[page->pageNum].pgdata);	//write back the contents
-		mgmtData->frames[page->pageNum].is_dirty = false;
+	if (mgmtData->frames[frameNum].is_dirty) {	//the frame is dirty, write the ocntents back
+		forcePage(bm, mgmtData->frames[frameNum].pgdata);	//write back the contents
+		mgmtData->frames[frameNum].is_dirty = false;
 	}
-	mgmtData->frames[page->pageNum].fix_count --;	//Decrement the fix_count by one
+	mgmtData->frames[frameNum].fix_count --;	//Decrement the fix_count by one
 	return RC_OK;
 }
 
@@ -381,18 +404,31 @@ RC unpinPage (BM_BufferPool *const bm, BM_PageHandle *const page) {
 RC markDirty (BM_BufferPool *const bm, BM_PageHandle *const page) {
 	BM_MgmtData *mgmtData = (BM_MgmtData *) bm->mgmtData;	//casting
 
+	int frameNum = -1; 	//used to get the frame number storing this page
 	TIMER++;		//increment globle timer
 
-	if (page->pageNum < 0 || page->pageNum > bm->numPages) {
-		printf("ERROR: exceeding the maximum number of pages!\n");
-		return RC_RANGE_ERROR;		//the pageNum is not correct, exceeding the numPages, or negative
+	for (int i = 0; i < bm->numPages; i++) {
+		if (mgmtData->frame2page[i] == page->pageNum) {
+			frameNum = i;
+			break;
+		}
 	}
+	if (frameNum == -1) {
+		printf("Cannot find the frame storing page %d\n", page->pageNum);
+		return RC_FRAME_NOT_FIND;
+	} 
 
-	if (mgmtData->frames[page->pageNum].is_dirty){	//the frame to be marked as dirty is already diry, needs to write back the contents first
-		forcePage(bm, mgmtData->frames[page->pageNum].pgdata);		//write back the content
+	// if (page->pageNum < 0 || page->pageNum > bm->numPages) {
+	// 	printf("ERROR: exceeding the maximum number of pages!\n");
+	// 	return RC_RANGE_ERROR;		//the pageNum is not correct, exceeding the numPages, or negative
+	// }
+
+	if (mgmtData->frames[frameNum].is_dirty){	//the frame to be marked as dirty is already diry, needs to write back the contents first
+		forcePage(bm, mgmtData->frames[frameNum].pgdata);		//write back the content
 	}
-	mgmtData->frames[page->pageNum].is_dirty = true;	//mark the frame as dirty
-	mgmtData->frames[page->pageNum].used_time = TIMER;	//set used timer as current timer
+	mgmtData->frames[frameNum].is_dirty = true;	//mark the frame as dirty
+	strcpy(mgmtData->frames[frameNum].pgdata->data, page->data);
+	mgmtData->frames[frameNum].used_time = TIMER;	//set used timer as current timer
 
 	return RC_OK;
 }
@@ -406,11 +442,25 @@ RC markDirty (BM_BufferPool *const bm, BM_PageHandle *const page) {
  */
 RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page) {
 	BM_MgmtData *mgmtData = (BM_MgmtData *) bm->mgmtData;	//casting
+	int frameNum = -1; 	//used to get the frame number storing this page
+	for (int i = 0; i < bm->numPages; i++) {
+		if (mgmtData->frame2page[i] == page->pageNum) {
+			frameNum = i;
+			break;
+		}
+	}
+	if (frameNum == -1) {
+		printf("Cannot find the frame storing page %d\n", page->pageNum);
+		return RC_FRAME_NOT_FIND;
+	} 
 
 	mgmtData->write_times ++;	//increment the write times by one
 	//write the data in pageNum's frame into the fileHandle, since all info are stored in bm, so directly call writeBlock function
-	return writeBlock(page->pageNum, mgmtData->fileHandle, mgmtData->frames[page->pageNum].pgdata->data);
-	//return RC_OK;
+	if (mgmtData->fileHandle->totalNumPages <= page->pageNum)
+		ensureCapacity(page->pageNum+1, mgmtData->fileHandle);
+	return writeBlock(page->pageNum, mgmtData->fileHandle, mgmtData->frames[frameNum].pgdata->data);
+	//return writeBlock(page->pageNum, mgmtData->fileHandle, page->data);
+	
 
 }
 //End Buffer Manager Interface Access Pages
