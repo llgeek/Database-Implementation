@@ -15,6 +15,7 @@ static int TIMER = 0;	//global timer, to track the load time and used time for F
 
 /********************************************************
  Define the struct BM_FrameHandle
+ Store each frame's content
  Xiaolin hu
  ********************************************************/
 typedef struct BM_FrameHandle{
@@ -24,8 +25,8 @@ typedef struct BM_FrameHandle{
     // char *data;
     BM_PageHandle *pgdata;	//page handle, stored the page num and its data in memory
     
-    int fix_count; //starting from 0
-    bool is_dirty; //true is dirty, false is clean
+    int fix_count; //starting from 0, store the number of clients using this frame
+    bool is_dirty; //true is dirty, false is clean, whether the contents is modified 
 
     //added by Linlin, used to keep loadtime and usedtime, for FIFO and LRU
     int load_time;	//the time this page is loaded to the frame, used in FIFO 
@@ -35,6 +36,7 @@ typedef struct BM_FrameHandle{
 
 /********************************************************
 Define the struct mgmtData
+used as bookkeeping for mgmtData pointer in BM_BufferPool
 Xiaolin hu
 ********************************************************/
 typedef struct BM_MgmtData { //The bookkeeping info
@@ -43,8 +45,8 @@ typedef struct BM_MgmtData { //The bookkeeping info
     BM_FrameHandle *frames; //Actually it's an array of frames
     SM_FileHandle *fileHandle;
     
-    int read_times;  //getNumReadIO()
-    int write_times;  //getNumWriteIO()
+    int read_times;  //getNumReadIO(), number of read times loading contents from disk to memory
+    int write_times;  //getNumWriteIO(), number of write times writing contents from memory to disk
 
     //added by Linlin Chen, to maintain a mapping between page number and page frames for fast look-ups
     //a page to frame mapping is not realstic, since the size of pages always change
@@ -205,7 +207,6 @@ RC forceFlushPool(BM_BufferPool *const bm){
  * A20348195
  * lchen96@hawk.iit.edu
  */
-
 
 /**
  * replace frame with FIFO
@@ -454,6 +455,11 @@ RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page) {
 	return writeBlock(page->pageNum, mgmtData->fileHandle, mgmtData->frames[frameNum].pgdata->data);
 }
 //End Buffer Manager Interface Access Pages
+/**
+ * Linlin Chen
+ * A20348195
+ * lchen96@hawk.iit.edu
+ */
 
 
 

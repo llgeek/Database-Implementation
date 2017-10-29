@@ -1,6 +1,6 @@
 CC=gcc
 CFLAGS=-lm
-STD=-std=gnu11
+STD=-std=gnu99
 
 
 test_assign2: test_assign2_1.o buffer_mgr.o buffer_mgr_stat.o dberror.o storage_mgr.o
