@@ -22,7 +22,7 @@ test_assign2_1.o: test_assign2_1.c test_helper.h storage_mgr.h buffer_mgr_stat.h
 	$(CC) -c $< $(STD)
 
 clean:
-	rm *.o test_assign2
+	rm *.o test_assign2 
 
 
 
