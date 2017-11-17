@@ -545,26 +545,25 @@ extern int getRecordSize (Schema *schema){
     for(i = 0; i < schema->numAttr; i++){
 
     	switch (schema->dataTypes[i]){
-
+    		
     		case DT_INT:
-            	recordSize += sizeof(int);
-            	break; 
+    			recordsize += sizeof(int);
+    			break;
 
-        	case DT_FLOAT:
-            	recordSize += sizeof(float);
-            	break;
+    		case DT_FLOAT:
+    			recordsize += sizeof(float);
+    			break;
 
-        	case DT_BOOL:
-            	recordSize += sizeof(bool);
-            	break;
+    		case DT_BOOL:
+    			recordsize += sizeof(bool);
+    			break;
 
-            case DT_STRING:
-            	recordSize += schema->typeLength[i];
-            	break;
-            	
-        	default:
-            	break;
+    		case DT_STRING:
+    			recordsize += schema->typeLength[i];
+    			break;
 
+    		default:
+    			break;
     	}
     }
 
