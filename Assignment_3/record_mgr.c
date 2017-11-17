@@ -582,7 +582,7 @@ extern int getRecordSize (Schema *schema){
 
 extern Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes, int *typeLength, int keySize, int *keys){
 
-	Schema *schema = (Schema *)malloc(sizeof(Schema)) //free above schema isn't required
+	Schema *schema = (Schema *)malloc(sizeof(Schema)); //free above schema isn't required
 
 	schema->numAttr = numAttr;
 	schema->attrNames = attrNames;
