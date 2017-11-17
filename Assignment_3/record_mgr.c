@@ -534,10 +534,12 @@ RC closeScan (RM_ScanHandle *scan) {
 
 extern int getRecordSize (Schema *schema){
 
-	//validate
-	if (!schema) {
-        return 0;
-    }
+	//Validating Schema
+
+	if(!schema){
+		return 0;
+	}
+	
 
     int recordSize = 0;
     int i;
