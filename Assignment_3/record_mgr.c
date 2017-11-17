@@ -549,19 +549,19 @@ extern int getRecordSize (Schema *schema){
     	switch (schema->dataTypes[i]){
     		
     		case DT_INT:
-    			recordsize += sizeof(int);
+    			recordSize += sizeof(int);
     			break;
 
     		case DT_FLOAT:
-    			recordsize += sizeof(float);
+    			recordSize += sizeof(float);
     			break;
 
     		case DT_BOOL:
-    			recordsize += sizeof(bool);
+    			recordSize += sizeof(bool);
     			break;
 
     		case DT_STRING:
-    			recordsize += schema->typeLength[i];
+    			recordSize += schema->typeLength[i];
     			break;
 
     		default:
@@ -589,7 +589,7 @@ extern Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes,
 	schema->dataTypes = dataTypes;
 	schema->typeLength = typeLength;
 	schema->keySize = keySize;
-	schema->keys = keys;
+	schema->keyAttrs = keys;
 
 	return schema;
 
