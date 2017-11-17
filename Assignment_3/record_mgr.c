@@ -517,3 +517,99 @@ RC closeScan (RM_ScanHandle *scan) {
  *  A20348195
  */
 
+
+
+/**
+ *
+ *  dealing with schemas
+ *	Start Implementation
+ *
+
+/**
+ *
+ * Module	:getRecordSize
+ * Description: It returns the size in bytes of record for a given schema
+ *
+ */
+
+extern int getRecordSize (Schema *schema){
+
+	//validate
+	if (!schema) {
+        return 0;
+    }
+
+    int recordSize = 0;
+    int i;
+
+    for(i = 0; i < schema->numAttr; i++){
+
+    	switch (schema->dataTypes[i]){
+
+    		case DT_INT:
+            	recordSize += sizeof(int);
+            	break; 
+
+        	case DT_FLOAT:
+            	recordSize += sizeof(float);
+            	break;
+
+        	case DT_BOOL:
+            	recordSize += sizeof(bool);
+            	break;
+
+            case DT_STRING:
+            	recordSize += schema->typeLength[i];
+            	break;
+            	
+        	default:
+            	break;
+
+    	}
+    }
+
+    return recordSize;
+
+}//getRecordSize
+
+/*
+ *
+ * Module	:createSchema
+ * Description: It creates new schema
+ *
+ */
+
+extern Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes, int *typeLength, int keySize, int *keys){
+
+	Schema *schema = (Schema *)malloc(sizeof(Schema)) //free above schema isn't required
+
+	schema->numAttr = numAttr;
+	schema->attrNames = attrNames;
+	schema->dataTypes = dataTypes;
+	schema->typeLength = typeLength;
+	schema->keySize = keySize;
+	schema->keys = keys;
+
+	return schema;
+
+}//*createSchema
+
+
+/*
+ *
+ * Module	:freeSchema
+ * Description: It free the schema
+ *
+ */
+
+extern RC freeSchema (Schema *schema){
+
+	free(schema);
+	return	RC_OK;
+
+}//freeSchema
+
+/**
+ * End Implementation
+**/
+
