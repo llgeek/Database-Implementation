@@ -651,23 +651,24 @@ RC offset_attr (Schema *schema, int attrNum, int *displacement)
     
 
     for(position = 0; position < attrNum; position++){
-        switch (schema->dataTypes[position]){
-		case DT_STRING:
+        if(schema->dataTypes[position] == DT_STRING){
 			disp += schema->typeLength[position];
-			break;
-			
-		case DT_INT:
+	}
+	else {
+		if(schema->dataTypes[position] == DT_INT){
 			disp += sizeof(int);
-			break;
-			
-		case DT_FLOAT:
-			disp += sizeof(float);
-			break;
-		
-		case DT_BOOL:
-			disp += sizeof(bool);
-			break;
-	  }
+		}
+		else {
+			if(schema->dataTypes[position] == DT_FLOAT){
+				disp += sizeof(float);
+			}
+			else{
+				if(schema->dataTypes[position] == DT_BOOL){
+					disp += sizeof(bool);
+				}
+			}
+		}
+	}
     }
 
 	//fetching the offser value
