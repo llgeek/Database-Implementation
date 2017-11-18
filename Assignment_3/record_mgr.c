@@ -606,6 +606,8 @@ extern Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes,
 extern RC freeSchema (Schema *schema){
 
 	free(schema);
+
+	//free schema memory
 	return	RC_OK;
 
 }//freeSchema
