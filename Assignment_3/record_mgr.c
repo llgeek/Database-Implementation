@@ -697,31 +697,30 @@ extern RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
 
 	
 	//value is pointed to attribute value based on the data type
-	switch(schema->dataTypes[attrNum])
-    {
-	//Integer
-        case DT_INT:
-            memcpy(&((*value)->v.intV),attributeData, sizeof(int));
-	    break;
-        //String
-        case DT_STRING:
-            int size;
+	if(schema->dataTypes[attrNum] == DT_STRING){
+	    int size;
 	    size = schema->typeLength[attrNum];
             char *s;
             s = (char *)malloc(size + 1);
             strncpy(s, attributeData, size);
             s[size] = '\0';
             (*value)->v.stringV = s;
-	    break;
-		//Float    
-        case DT_FLOAT:
-            memcpy(&((*value)->v.floatV),attributeData, sizeof(float));
-	    break;
-	    //Boolean   
-        case DT_BOOL:
-            memcpy(&((*value)->v.boolV),attributeData, sizeof(bool));
-            break;
-    }
+	}
+	else {
+		if(schema->dataTypes[attrNum] == DT_INT){
+			memcpy(&((*value)->v.intV),attributeData, sizeof(int));
+		}
+		else {
+			if(schema->dataTypes[attrNum] == DT_FLOAT){
+				memcpy(&((*value)->v.floatV),attributeData, sizeof(float));
+			}
+			else{
+				if(schema->dataTypes[attrNum] == DT_BOOL){
+					memcpy(&((*value)->v.boolV),attributeData, sizeof(bool));
+				}
+			}
+		}
+	}
 
     return RC_OK;
 
