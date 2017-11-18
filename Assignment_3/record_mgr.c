@@ -649,8 +649,8 @@ extern RC freeRecord (Record *record){
 RC offset_attr (Schema *schema, int attrNum, int *displacement)
 {
     
-    int disp = position = 0;
-    
+    int disp  = 0;
+    int position = 0;
 
     for(position = 0; position < attrNum; position++){
         if(schema->dataTypes[position] == DT_STRING){
