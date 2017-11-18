@@ -740,25 +740,28 @@ extern RC setAttr (Record *record, Schema *schema, int attrNum, Value *value){
     data = record->data + displacement;
 
      // Setting attribute values */
-    switch(schema->dataTypes[attrNum])
-    {
-        case DT_INT:
-           memcpy(data,&(value->v.intV),sizeof(int));
-           break;
-        case DT_STRING:
-            char *s;
+    if(schema->dataTypes[attrNum] == DT_STRING){
+	    char *s;
             int length = schema->typeLength[attrNum];
             s = (char *) malloc(length);
             s = value->v.stringV;
             memcpy(data,(s), length);
-            break;
-        case DT_FLOAT:
-	    memcpy(data,&((value->v.floatV)), sizeof(float));
-            break;
-        case DT_BOOL:
-            memcpy(data,&((value->v.boolV)), sizeof(bool));
-            break;
-    }
+	}
+	else {
+		if(schema->dataTypes[attrNum] == DT_INT){
+			memcpy(data,&(value->v.intV),sizeof(int));
+		}
+		else {
+			if(schema->dataTypes[attrNum] == DT_FLOAT){
+				memcpy(data,&((value->v.floatV)), sizeof(float));
+			}
+			else{
+				if(schema->dataTypes[attrNum] == DT_BOOL){
+					memcpy(data,&((value->v.boolV)), sizeof(bool));
+				}
+			}
+		}
+	}
 
     return RC_OK;
 }
