@@ -610,7 +610,155 @@ extern RC freeSchema (Schema *schema){
 
 }//freeSchema
 
-/**
- * End Implementation
-**/
+
+
+/* Dealing with records and attribute values */
+
+// Allocates memory for the record
+extern RC createRecord (Record **record, Schema *schema){
+
+	
+	int record_size = sizeof(Record); 
+	//Allocating memory to new record
+	*record = (Record *)  malloc(record_size);
+	
+	
+	//Allocating memory to data of the record
+	(*record)->data = (char *)malloc((getRecordSize(schema)));
+	
+   	 return RC_OK;
+}
+
+//Freeing the record
+extern RC freeRecord (Record *record){
+    /* free the memory space allocated to record and its data */
+	 
+    //Free the data of record memory
+    free(record->data);
+	
+    //Free the record memorry
+    free(record);
+
+    //Returning from here
+    return RC_OK;
+}
+
+//Returning the ofset value of various attributes 
+RC offset_attr (Schema *schema, int attrNum, int *displacement)
+{
+    
+    int disp = position = 0;
+    
+
+    for(position = 0; position < attrNum; position++){
+        switch (schema->dataTypes[position]){
+		case DT_STRING:
+			disp += schema->typeLength[position];
+			break;
+			
+		case DT_INT:
+			disp += sizeof(int);
+			break;
+			
+		case DT_FLOAT:
+			disp += sizeof(float);
+			break;
+		
+		case DT_BOOL:
+			disp += sizeof(bool);
+			break;
+	  }
+    }
+
+	//fetching the offser value
+    *displacement = disp;
+	
+	//Returning rc value
+    return RC_OK;
+}
+
+
+//Getting the attributes
+extern RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
+
+	int size_of_val = sizeof(Value);
+    *value = (Value *)malloc(size_of_val);
+    
+	int displacement; char *attributeData;
+
+	// Getting the offset value in displacement
+    offset_attr(schema, attrNum, &displacement);
+	
+	//Filling the attribute data
+    attributeData = (record->data + displacement);
+    
+	(*value)->dt = schema->dataTypes[attrNum];
+
+	
+	//value is pointed to attribute value based on the data type
+	switch(schema->dataTypes[attrNum])
+    {
+	//Integer
+        case DT_INT:
+            memcpy(&((*value)->v.intV),attributeData, sizeof(int));
+	    break;
+        //String
+        case DT_STRING:
+            int size;
+	    size = schema->typeLength[attrNum];
+            char *s;
+            s = (char *)malloc(size + 1);
+            strncpy(s, attributeData, size);
+            s[size] = '\0';
+            (*value)->v.stringV = s;
+	    break;
+		//Float    
+        case DT_FLOAT:
+            memcpy(&((*value)->v.floatV),attributeData, sizeof(float));
+	    break;
+	    //Boolean   
+        case DT_BOOL:
+            memcpy(&((*value)->v.boolV),attributeData, sizeof(bool));
+            break;
+    }
+
+    return RC_OK;
+
+}
+
+//Setting the attributes
+
+extern RC setAttr (Record *record, Schema *schema, int attrNum, Value *value){
+ 
+   int displacement; 
+   char * data;
+
+	// Getting the offset value in displacement
+    offset_attr(schema, attrNum, &displacement);
+	
+    data = record->data + displacement;
+
+     // Setting attribute values */
+    switch(schema->dataTypes[attrNum])
+    {
+        case DT_INT:
+           memcpy(data,&(value->v.intV),sizeof(int));
+           break;
+        case DT_STRING:
+            char *s;
+            int length = schema->typeLength[attrNum];
+            s = (char *) malloc(length);
+            s = value->v.stringV;
+            memcpy(data,(s), length);
+            break;
+        case DT_FLOAT:
+	    memcpy(data,&((value->v.floatV)), sizeof(float));
+            break;
+        case DT_BOOL:
+            memcpy(data,&((value->v.boolV)), sizeof(bool));
+            break;
+    }
+
+    return RC_OK;
+}
 
