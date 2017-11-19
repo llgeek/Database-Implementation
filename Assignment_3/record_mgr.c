@@ -127,13 +127,15 @@ RC createTable (char *name, Schema *schema){
 	for (int i = 0; i < schema->numAttr; i++) {
 		attrLens = strlen(schema->attrNames[i])+1;	//get the length of an attribute
 		memcpy(newpage+offset, schema->attrNames[i], attrLens);
+		*(newpage + offset + attrLens) = '\0';		//set NULL terminator, in case
+		//strcpy(newpage+offset, schema->attrNames[i]);
 		offset += attrLens;
 	}
 
 	//set dataTypes
 	for (int i = 0; i < schema->numAttr; i++) {
-		memcpy(newpage+offset, &(schema->dataTypes[i]), sizeof(int));
-		offset += sizeof(int);
+		memcpy(newpage+offset, &(schema->dataTypes[i]), sizeof(DataType));
+		offset += sizeof(DataType);
 	}
 
 	//set typeLength
@@ -143,7 +145,6 @@ RC createTable (char *name, Schema *schema){
 	}
 
 	//set the keySize
-	//IS keySzie = # of keys?
 	//Thick: set the keySize firstly
 	memcpy(newpage + offset, &(schema->keySize), sizeof(int));
 	offset += sizeof(int);
@@ -153,7 +154,6 @@ RC createTable (char *name, Schema *schema){
 		memcpy(newpage + offset, &(schema->keyAttrs[i]), sizeof(int));
 		offset += sizeof(int);
 	}
-
 
 
 	//create a pageHanle to store the string
@@ -168,15 +168,14 @@ RC createTable (char *name, Schema *schema){
 		return rc;
 	if ((rc = unpinPage(bm, aPage))!= RC_OK)
 		return rc;
-	if ((rc = forceFlushPool(bm))!= RC_OK)
-		return rc;
+	// if ((rc = forceFlushPool(bm))!= RC_OK)
+	// 	return rc;
 	if ((rc = shutdownBufferPool(bm))!= RC_OK)
 		return rc;
 
-
-	free(bm);
-	free(aPage);
 	free(newpage);
+	free(aPage);
+	free(bm);
 
 	return rc;
 
@@ -200,7 +199,8 @@ RC openTable (RM_TableData *rel, char *name){
 	initBufferPool(bm, name, 100, RS_LRU, NULL);
 
 	//set the name of Record Manager
-	rel->name = name;
+	rel->name = (char *) malloc(sizeof(char)*10);
+	strcpy(rel->name, name);
 
 	//initialize RM_TableInfo
 	RM_TableInfo *tableInfo = (RM_TableInfo *) malloc(sizeof(RM_TableInfo));
@@ -220,12 +220,12 @@ RC openTable (RM_TableData *rel, char *name){
 	//read the schema into RM_TableData
 	//initialize the pagefile
 	char *newpage = aPage->data;
-	int offset = 0;
 
 	Schema *aschema = (Schema *) malloc(sizeof(Schema));
 
   	//set numAttr
 	int numAttr;
+	int offset = 0;
 	memcpy(&numAttr, newpage+offset, sizeof(int));
 	aschema -> numAttr = numAttr;
 	offset += sizeof(int);
@@ -234,43 +234,48 @@ RC openTable (RM_TableData *rel, char *name){
 	char attrBuff[255];	//need malloc()?
 	int attrLens;	// a counter to get the length of each attribute
 	aschema -> attrNames=(char **)malloc(sizeof(char*)*numAttr);
-	for(int i =0;i<numAttr;i++){
+
+	for (int i = 0; i < numAttr; i++) { 
 		memset(attrBuff, '\0', 255);
-		attrLens=0;
-		while(*(newpage+offset++)!='\0'){
-			attrBuff[attrLens]=*(newpage+offset-1);
-			attrLens++;
+		attrLens = 0;
+		while(*(newpage + offset) != '\0') { 		//find the terminator, assiging the string (name of attributes)
+			attrBuff[attrLens] = *(newpage + offset);
+			attrLens ++;
+			offset ++;
 		}
-		aschema -> attrNames[i] = (char *)malloc(attrLens*sizeof(char)+1);
-	    memcpy(aschema->attrNames[i], attrBuff, attrLens);  //or attrLens+1?
+		aschema -> attrNames[i] = (char *)malloc((attrLens+1)*sizeof(char));
+	    //memcpy(aschema->attrNames[i], attrBuff, attrLens);  //or attrLens+1?
+	    strcpy(aschema->attrNames[i], attrBuff);
 	}
 
 	//set dataTypes
-	aschema->dataTypes=(DataType *) malloc(sizeof(DataType) * numAttr);
-	for(int i =0;i<numAttr;i++){
-
-		aschema->dataTypes[i]=(int)malloc(sizeof(int));
-		aschema->dataTypes[i] = *((int *)(newpage+offset));
-		offset += sizeof(int);
-
+	aschema->dataTypes = (DataType *) malloc(sizeof(DataType) * numAttr);
+	for (int i = 0; i < numAttr; i++) {
+		//aschema->dataTypes[i] = (int)malloc(sizeof(int));
+		//aschema->dataTypes[i] = *((int *)(newpage + offset));
+		memcpy(&(aschema->dataTypes[i]), newpage + offset, sizeof(DataType));
+		offset += sizeof(DataType);
 	}
 
 	//set typeLength
-	aschema->typeLength=(int *)malloc(sizeof(int *)*numAttr);
-	for(int i =0; i<numAttr; i++) {
-		aschema->typeLength[i] = *((int *) (newpage + offset));
+	aschema->typeLength = (int *) malloc(sizeof(int) * numAttr);
+	for (int i = 0; i < numAttr; i++) {
+		//aschema->typeLength[i] = *((int *) (newpage + offset));
+		memcpy(&(aschema->typeLength[i]), newpage + offset, sizeof(int));
 		offset += sizeof(int);
 	}
 
 	//set keysize firstly
-	int keySize = *((int *)(newpage+offset));
-	aschema->keySize= keySize;
-	offset+=sizeof(int);
+	//int keySize = *((int *)(newpage+offset));
+	//aschema->keySize= keySize;
+	memcpy(&(aschema->keySize), newpage + offset, sizeof(int));
+	offset += sizeof(int);
 
 	//set keyArrtibutes
-	aschema->keyAttrs=(int *)malloc(sizeof(int *)*keySize);
-	for(int i =0;i<aschema->keySize;i++) {        //allocate the space to store the number attributes
-	   	aschema->keyAttrs[i] = *((int *) (newpage + offset));
+	aschema->keyAttrs = (int *)malloc(sizeof(int) * aschema->keySize);
+	for(int i = 0; i < aschema->keySize; i++) {        //allocate the space to store the number attributes
+	   	//aschema->keyAttrs[i] = *((int *) (newpage + offset));
+	   	memcpy(&(aschema->keyAttrs[i]), newpage + offset, sizeof(int));
 	    offset += sizeof(int); 
 	}
 
@@ -278,7 +283,7 @@ RC openTable (RM_TableData *rel, char *name){
 
 	rel->schema = aschema;
 	unpinPage(bm, aPage);
-	free(newpage);
+	free(aPage);
 	return RC_OK;
 }
 
