@@ -602,6 +602,8 @@ extern Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes,
 extern RC freeSchema (Schema *schema){
 
 	free(schema);
+
+	//free schema memory
 	return	RC_OK;
 
 }//freeSchema
@@ -643,28 +645,34 @@ extern RC freeRecord (Record *record){
 RC offset_attr (Schema *schema, int attrNum, int *displacement)
 {
     
+<<<<<<< HEAD
     int disp = 0;
     int position = 0;
     
+=======
+    int disp  = 0;
+    int position = 0;
+>>>>>>> 6b4118aeef3144b3c56214b95620a5878905d83f
 
     for(position = 0; position < attrNum; position++){
-        switch (schema->dataTypes[position]){
-		case DT_STRING:
+        if(schema->dataTypes[position] == DT_STRING){
 			disp += schema->typeLength[position];
-			break;
-			
-		case DT_INT:
+	}
+	else {
+		if(schema->dataTypes[position] == DT_INT){
 			disp += sizeof(int);
-			break;
-			
-		case DT_FLOAT:
-			disp += sizeof(float);
-			break;
-		
-		case DT_BOOL:
-			disp += sizeof(bool);
-			break;
-	  }
+		}
+		else {
+			if(schema->dataTypes[position] == DT_FLOAT){
+				disp += sizeof(float);
+			}
+			else{
+				if(schema->dataTypes[position] == DT_BOOL){
+					disp += sizeof(bool);
+				}
+			}
+		}
+	}
     }
 
 	//fetching the offser value
@@ -693,6 +701,7 @@ extern RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
 
 	int size;
 	//value is pointed to attribute value based on the data type
+<<<<<<< HEAD
 	switch(schema->dataTypes[attrNum])
     {
 	//Integer
@@ -702,21 +711,32 @@ extern RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
         //String
         case DT_STRING:
 	    	size = schema->typeLength[attrNum];
+=======
+	if(schema->dataTypes[attrNum] == DT_STRING){
+	    int size;
+	    size = schema->typeLength[attrNum];
+>>>>>>> 6b4118aeef3144b3c56214b95620a5878905d83f
             char *s;
             s = (char *)malloc(size + 1);
             strncpy(s, attributeData, size);
             s[size] = '\0';
             (*value)->v.stringV = s;
-	    break;
-		//Float    
-        case DT_FLOAT:
-            memcpy(&((*value)->v.floatV),attributeData, sizeof(float));
-	    break;
-	    //Boolean   
-        case DT_BOOL:
-            memcpy(&((*value)->v.boolV),attributeData, sizeof(bool));
-            break;
-    }
+	}
+	else {
+		if(schema->dataTypes[attrNum] == DT_INT){
+			memcpy(&((*value)->v.intV),attributeData, sizeof(int));
+		}
+		else {
+			if(schema->dataTypes[attrNum] == DT_FLOAT){
+				memcpy(&((*value)->v.floatV),attributeData, sizeof(float));
+			}
+			else{
+				if(schema->dataTypes[attrNum] == DT_BOOL){
+					memcpy(&((*value)->v.boolV),attributeData, sizeof(bool));
+				}
+			}
+		}
+	}
 
     return RC_OK;
 
@@ -737,23 +757,37 @@ extern RC setAttr (Record *record, Schema *schema, int attrNum, Value *value){
 	char *s;
     int length = schema->typeLength[attrNum];
      // Setting attribute values */
+<<<<<<< HEAD
     switch(schema->dataTypes[attrNum])
     {
         case DT_INT:
            memcpy(data,&(value->v.intV),sizeof(int));
            break;
         case DT_STRING:
+=======
+    if(schema->dataTypes[attrNum] == DT_STRING){
+	    char *s;
+            int length = schema->typeLength[attrNum];
+>>>>>>> 6b4118aeef3144b3c56214b95620a5878905d83f
             s = (char *) malloc(length);
             s = value->v.stringV;
             memcpy(data,(s), length);
-            break;
-        case DT_FLOAT:
-	    memcpy(data,&((value->v.floatV)), sizeof(float));
-            break;
-        case DT_BOOL:
-            memcpy(data,&((value->v.boolV)), sizeof(bool));
-            break;
-    }
+	}
+	else {
+		if(schema->dataTypes[attrNum] == DT_INT){
+			memcpy(data,&(value->v.intV),sizeof(int));
+		}
+		else {
+			if(schema->dataTypes[attrNum] == DT_FLOAT){
+				memcpy(data,&((value->v.floatV)), sizeof(float));
+			}
+			else{
+				if(schema->dataTypes[attrNum] == DT_BOOL){
+					memcpy(data,&((value->v.boolV)), sizeof(bool));
+				}
+			}
+		}
+	}
 
     return RC_OK;
 }
