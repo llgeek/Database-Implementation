@@ -10,6 +10,8 @@
 #define RC_PIN_NOUNUSED	19
 #define RC_FRAME_NOT_FIND 20
 
+#define RC_DATATYPE_ERROR 21
+
 
 /********************************************************
 Define the struct RM_tableInfo
@@ -117,7 +119,7 @@ RC createTable (char *name, Schema *schema){
 
 	//convert a schema to string, then write the string into the page
 	//set numAttr
-	memcpy(newpage+offset, schema->numAttr, sizeof(int));
+	memcpy(newpage+offset, &(schema->numAttr), sizeof(int));
 	offset += sizeof(int);
 
 	//set attriNames
@@ -130,32 +132,32 @@ RC createTable (char *name, Schema *schema){
 
 	//set dataTypes
 	for (int i = 0; i < schema->numAttr; i++) {
-		memcpy(newpage+offset, schema->dataTypes[i], sizeof(int));
+		memcpy(newpage+offset, &(schema->dataTypes[i]), sizeof(int));
 		offset += sizeof(int);
 	}
 
 	//set typeLength
 	for (int i = 0; i < schema->numAttr; i++) {
-		memcpy(newpage + offset, schema->typeLength[i], sizeof(int));
+		memcpy(newpage + offset, &(schema->typeLength[i]), sizeof(int));
 		offset += sizeof(int);
 	}
 
 	//set the keySize
 	//IS keySzie = # of keys?
 	//Thick: set the keySize firstly
-	memcpy(newpage + offset, schema->keySize, sizeof(int));
+	memcpy(newpage + offset, &(schema->keySize), sizeof(int));
 	offset += sizeof(int);
 
 	//set the keyAttrs
 	for (int i = 0; i < schema->keySize; i++) {
-		memcpy(newpage + offset, schema->keyAttrs[i], sizeof(int));
+		memcpy(newpage + offset, &(schema->keyAttrs[i]), sizeof(int));
 		offset += sizeof(int);
 	}
 
 
 
 	//create a pageHanle to store the string
-	BM_PageHandle *aPage = MAKE_HANDLE();
+	BM_PageHandle *aPage = MAKE_PAGE_HANDLE();
 	//set the pointer at page 0 of the buffermgr.
 	pinPage(bm, aPage, 0);
 
@@ -210,7 +212,7 @@ RC openTable (RM_TableData *rel, char *name){
 	rel -> mgmtData = tableInfo;
 
 	//create a pageHanle to store the string
-	BM_PageHandle *aPage = MAKE_HANDLE();
+	BM_PageHandle *aPage = MAKE_PAGE_HANDLE();
 	//set the pointer at page 0 of the buffermgr.
 	pinPage(bm, aPage, 0);
 
@@ -224,7 +226,7 @@ RC openTable (RM_TableData *rel, char *name){
 
   	//set numAttr
 	int numAttr;
-	memcpy(numAttr, newpage+offset, sizeof(int));
+	memcpy(&numAttr, newpage+offset, sizeof(int));
 	aschema -> numAttr = numAttr;
 	offset += sizeof(int);
 
@@ -233,14 +235,14 @@ RC openTable (RM_TableData *rel, char *name){
 	int attrLens;	// a counter to get the length of each attribute
 	aschema -> attrNames=(char **)malloc(sizeof(char*)*numAttr);
 	for(int i =0;i<numAttr;i++){
-		attrBuff[255]="";
+		memset(attrBuff, '\0', 255);
 		attrLens=0;
 		while(*(newpage+offset++)!='\0'){
 			attrBuff[attrLens]=*(newpage+offset-1);
 			attrLens++;
 		}
 		aschema -> attrNames[i] = (char *)malloc(attrLens*sizeof(char)+1);
-	    memcpy(aschema->attrNames[i],attrBuff,attrLens);  //or attrLens+1?
+	    memcpy(aschema->attrNames[i], attrBuff, attrLens);  //or attrLens+1?
 	}
 
 	//set dataTypes
@@ -520,48 +522,46 @@ RC closeScan (RM_ScanHandle *scan) {
  *  dealing with schemas
  *	Start Implementation
  *
-
+**/
 /**
  *
  * Module	:getRecordSize
  * Description: It returns the size in bytes of record for a given schema
- *
- */
+ * If exists error in dealing with the schema, return -1
+ **/
 
-extern int getRecordSize (Schema *schema){
+int getRecordSize (Schema *schema){
 
 	//Validating Schema
-
-	if(!schema){
-		return 0;
+	if(!schema) {
+		return -1;
 	}
 	
-
     int recordSize = 0;
-    int i;
 
-    for(i = 0; i < schema->numAttr; i++){
-
+    for(int i = 0; i < schema->numAttr; i++){
     	switch (schema->dataTypes[i]){
-    		
+    		//data type is int
     		case DT_INT:
     			recordSize += sizeof(int);
     			break;
-
+    		//data type is float
     		case DT_FLOAT:
     			recordSize += sizeof(float);
     			break;
-
+    		//data tpe if bool
     		case DT_BOOL:
     			recordSize += sizeof(bool);
     			break;
-
+    		//data type is string
     		case DT_STRING:
-    			recordSize += schema->typeLength[i];
+    			recordSize += schema->typeLength[i] * sizeof(char);
     			break;
-
+    		// cannot find such data type
+    		// return -1
     		default:
-    			break;
+    			printf("Datatype Error!\n");
+    			return -1;
     	}
     }
 
@@ -576,16 +576,34 @@ extern int getRecordSize (Schema *schema){
  *
  */
 
-extern Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes, int *typeLength, int keySize, int *keys){
+Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes, int *typeLength, int keySize, int *keys){
 
-	Schema *schema = (Schema *)malloc(sizeof(Schema)); //free above schema isn't required
+	Schema *schema = (Schema *)malloc(sizeof(Schema)); 
 
+	//assigning value to the schema
 	schema->numAttr = numAttr;
-	schema->attrNames = attrNames;
-	schema->dataTypes = dataTypes;
-	schema->typeLength = typeLength;
+
+	//to keep the parameters safe, we should malloc new space instead of assigning parameters' pointer here
+	//allocating space
+	schema->attrNames = (char **)malloc(sizeof(char)*numAttr);
+	schema->dataTypes = (DataType *) malloc(sizeof(DataType)*numAttr);
+	schema->typeLength = (int *) malloc(sizeof(int)*numAttr);
+
+	//assigning values
+	for (int i = 0; i < numAttr; i++) {
+		schema->attrNames[i] = (char *) malloc(sizeof(char)*5);
+		memset(schema->attrNames[i], '\0', 5);
+		strcpy(schema->attrNames[i], attrNames[i]);
+
+		schema->dataTypes[i] = dataTypes[i];
+		schema->typeLength[i] = typeLength[i];
+	}
+	
 	schema->keySize = keySize;
-	schema->keyAttrs = keys;
+
+	schema->keyAttrs = (int *) malloc(sizeof(int)*keySize);
+	for (int i = 0; i < keySize; i++)
+		schema->keyAttrs[i] = keys[i];
 
 	return schema;
 
@@ -599,7 +617,15 @@ extern Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes,
  *
  */
 
-extern RC freeSchema (Schema *schema){
+RC freeSchema (Schema *schema){
+	//should free all space allocated in createSchema function
+	for (int i = 0; i < schema->numAttr; i++) {
+		free(schema->attrNames[i]);
+	}
+	free(schema->attrNames);
+	free(schema->dataTypes);
+	free(schema->typeLength);
+	free(schema->keyAttrs);
 
 	free(schema);
 
@@ -613,181 +639,145 @@ extern RC freeSchema (Schema *schema){
 /* Dealing with records and attribute values */
 
 // Allocates memory for the record
-extern RC createRecord (Record **record, Schema *schema){
-
-	
-	int record_size = sizeof(Record); 
-	//Allocating memory to new record
-	*record = (Record *)  malloc(record_size);
-	
-	
-	//Allocating memory to data of the record
-	(*record)->data = (char *)malloc((getRecordSize(schema)));
+RC createRecord (Record **record, Schema *schema){
+	//allocating the space for record
+	*record = (Record *) malloc(sizeof(Record));
+	//(*record)->id = (RID *) malloc(sizeof(RID));
+	//data size should equal to one record size in schema
+	(*record)->data = (char *) malloc(getRecordSize(schema));
 	
    	 return RC_OK;
 }
 
 //Freeing the record
-extern RC freeRecord (Record *record){
+RC freeRecord (Record *record){
     /* free the memory space allocated to record and its data */
 	 
     //Free the data of record memory
     free(record->data);
 	
+	//free ths space for id
+	//free(record->id);
+
     //Free the record memorry
     free(record);
 
-    //Returning from here
+    //Returning RC_OK if sucessful
     return RC_OK;
 }
 
-//Returning the ofset value of various attributes 
-RC offset_attr (Schema *schema, int attrNum, int *displacement)
-{
-    
-<<<<<<< HEAD
-    int disp = 0;
-    int position = 0;
-    
-=======
-    int disp  = 0;
-    int position = 0;
->>>>>>> 6b4118aeef3144b3c56214b95620a5878905d83f
 
-    for(position = 0; position < attrNum; position++){
-        if(schema->dataTypes[position] == DT_STRING){
-			disp += schema->typeLength[position];
-	}
-	else {
-		if(schema->dataTypes[position] == DT_INT){
-			disp += sizeof(int);
-		}
+/**
+ * This function is used to get the position offset of the attrNum_th attributes
+ * This function will be used in setAttr and getAttr functions
+ * @param  schema  schema of the table
+ * @param  attrNum offset of the attribute num
+ * @return         offset position
+ */
+int offsetAttr(Schema *schema, int attrNum) {
+	int offset = 0;
+	for (int i = 0; i < attrNum; i++) {
+		if (schema->dataTypes[i] == DT_INT) 
+			offset += sizeof(int);
+		else if (schema->dataTypes[i] == DT_STRING)
+			offset += schema->typeLength[i] * sizeof(char);
+		else if (schema->dataTypes[i] == DT_FLOAT)
+			offset += sizeof(float);
+		else if (schema->dataTypes[i] == DT_BOOL)
+			offset += sizeof(bool);
 		else {
-			if(schema->dataTypes[position] == DT_FLOAT){
-				disp += sizeof(float);
-			}
-			else{
-				if(schema->dataTypes[position] == DT_BOOL){
-					disp += sizeof(bool);
-				}
-			}
+			//finding error 
+			//no such data type allowed
+			printf("DATA TYPE ERROR!\n");
+			return -1;
 		}
 	}
+	return offset;
+}
+
+
+//Getting the value of the attrnum_th attribute in table
+//Note attrNum should start from 1 here
+RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
+	//allocating space for value result
+	Value *tmpv = (Value *)malloc(sizeof(Value));	
+	//value type assigned according to schema
+	tmpv->dt = schema->dataTypes[attrNum];
+
+	int offset = offsetAttr(schema, attrNum);
+
+	//-1 means we get a data type which is not defined in the schema
+	if (offset == -1) {
+		printf("Error: data type not allowed!\n");
+		return RC_DATATYPE_ERROR;
+	}
+    
+    //set the value for value of attrNum_th attributes
+    int typelength = 0;
+    switch(schema->dataTypes[attrNum]) {
+    	case DT_INT:		//data type int
+    		memcpy(&(tmpv->v.intV), record->data + offset, sizeof(int));
+    		break;
+
+    	case DT_STRING:		//data type string
+    		typelength = schema->typeLength[attrNum];
+    		tmpv->v.stringV = (char *)malloc(sizeof(char)*(typelength+1));	//reserve 1 space for '\0'
+    		strncpy(tmpv->v.stringV, record->data + offset, typelength);
+    		tmpv->v.stringV[typelength] = '\0';		// add the edding character for the string
+    		break;
+
+    	case DT_FLOAT:		//data type float
+    		memcpy(&(tmpv->v.floatV), record->data + offset, sizeof(float));
+    		break;
+
+    	case DT_BOOL:		//data type bool
+    		memcpy(&(tmpv->v.boolV), record->data + offset, sizeof(bool));
+    		break;
+    	default:		//finding error, no such data type allowed
+    		printf("Error: data type not allowed!\n");
+			return RC_DATATYPE_ERROR;
     }
-
-	//fetching the offser value
-    *displacement = disp;
-	
-	//Returning rc value
-    return RC_OK;
-}
-
-
-//Getting the attributes
-extern RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
-
-	int size_of_val = sizeof(Value);
-    *value = (Value *)malloc(size_of_val);
-    
-	int displacement; char *attributeData;
-
-	// Getting the offset value in displacement
-    offset_attr(schema, attrNum, &displacement);
-	
-	//Filling the attribute data
-    attributeData = (record->data + displacement);
-    
-	(*value)->dt = schema->dataTypes[attrNum];
-
-	int size;
-	//value is pointed to attribute value based on the data type
-<<<<<<< HEAD
-	switch(schema->dataTypes[attrNum])
-    {
-	//Integer
-        case DT_INT:
-            memcpy(&((*value)->v.intV),attributeData, sizeof(int));
-	    break;
-        //String
-        case DT_STRING:
-	    	size = schema->typeLength[attrNum];
-=======
-	if(schema->dataTypes[attrNum] == DT_STRING){
-	    int size;
-	    size = schema->typeLength[attrNum];
->>>>>>> 6b4118aeef3144b3c56214b95620a5878905d83f
-            char *s;
-            s = (char *)malloc(size + 1);
-            strncpy(s, attributeData, size);
-            s[size] = '\0';
-            (*value)->v.stringV = s;
-	}
-	else {
-		if(schema->dataTypes[attrNum] == DT_INT){
-			memcpy(&((*value)->v.intV),attributeData, sizeof(int));
-		}
-		else {
-			if(schema->dataTypes[attrNum] == DT_FLOAT){
-				memcpy(&((*value)->v.floatV),attributeData, sizeof(float));
-			}
-			else{
-				if(schema->dataTypes[attrNum] == DT_BOOL){
-					memcpy(&((*value)->v.boolV),attributeData, sizeof(bool));
-				}
-			}
-		}
-	}
-
+    *value = tmpv;
     return RC_OK;
 
 }
 
-//Setting the attributes
+//see the value for attrNum_th attributes, according to the value
+//attrNum should start from 1, instead of 0, here
+RC setAttr (Record *record, Schema *schema, int attrNum, Value *value) {
 
-extern RC setAttr (Record *record, Schema *schema, int attrNum, Value *value){
- 
-   int displacement; 
-   char * data;
+	int offset = offsetAttr(schema, attrNum);
 
-	// Getting the offset value in displacement
-    offset_attr(schema, attrNum, &displacement);
-	
-    data = record->data + displacement;
-	
-	char *s;
-    int length = schema->typeLength[attrNum];
-     // Setting attribute values */
-<<<<<<< HEAD
-    switch(schema->dataTypes[attrNum])
-    {
-        case DT_INT:
-           memcpy(data,&(value->v.intV),sizeof(int));
-           break;
-        case DT_STRING:
-=======
-    if(schema->dataTypes[attrNum] == DT_STRING){
-	    char *s;
-            int length = schema->typeLength[attrNum];
->>>>>>> 6b4118aeef3144b3c56214b95620a5878905d83f
-            s = (char *) malloc(length);
-            s = value->v.stringV;
-            memcpy(data,(s), length);
+	//-1 means we get a data type which is not defined in the schema
+	if (offset == -1) {
+		printf("Error: data type not allowed!\n");
+		return RC_DATATYPE_ERROR;
 	}
-	else {
-		if(schema->dataTypes[attrNum] == DT_INT){
-			memcpy(data,&(value->v.intV),sizeof(int));
-		}
-		else {
-			if(schema->dataTypes[attrNum] == DT_FLOAT){
-				memcpy(data,&((value->v.floatV)), sizeof(float));
-			}
-			else{
-				if(schema->dataTypes[attrNum] == DT_BOOL){
-					memcpy(data,&((value->v.boolV)), sizeof(bool));
-				}
-			}
-		}
-	}
+	char *data = record->data + offset;		//get the start location to be written
+
+    //set the value for record of attrNum_th attributes
+    int typelength = 0;
+    switch(schema->dataTypes[attrNum]) {
+    	case DT_INT:		//data type int
+    		memcpy(data, &(value->v.intV), sizeof(int));
+    		break;
+
+    	case DT_STRING:		//data type string
+    		typelength = schema->typeLength[attrNum];
+    		strncpy(data, value->v.stringV, typelength);		//no '\0' will be copied
+    		break;
+
+    	case DT_FLOAT:		//data type float
+    		memcpy(data, &(value->v.floatV), sizeof(float));
+    		break;
+
+    	case DT_BOOL:		//data type bool
+    		memcpy(data, &(value->v.boolV), sizeof(bool));
+    		break;
+    	default:		//finding error, no such data type allowed
+    		printf("Error: data type not allowed!\n");
+			return RC_DATATYPE_ERROR;
+    }
 
     return RC_OK;
 }
