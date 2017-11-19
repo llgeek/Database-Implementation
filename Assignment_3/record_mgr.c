@@ -10,10 +10,6 @@
 #define RC_PIN_NOUNUSED	19
 #define RC_FRAME_NOT_FIND 20
 
-#define RC_FILE_CREATION_FAILED 21
-#define RC_FILE_NOT_CLOSED 22
-#define RC_INCOMPATIBLE_BLOCKSIZE 23
-#define RC_FILE_OFFSET_FAILED 24
 
 /********************************************************
 Define the struct RM_tableInfo
@@ -647,7 +643,8 @@ extern RC freeRecord (Record *record){
 RC offset_attr (Schema *schema, int attrNum, int *displacement)
 {
     
-    int disp = position = 0;
+    int disp = 0;
+    int position = 0;
     
 
     for(position = 0; position < attrNum; position++){
@@ -694,7 +691,7 @@ extern RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
     
 	(*value)->dt = schema->dataTypes[attrNum];
 
-	
+	int size;
 	//value is pointed to attribute value based on the data type
 	switch(schema->dataTypes[attrNum])
     {
@@ -704,8 +701,7 @@ extern RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
 	    break;
         //String
         case DT_STRING:
-            int size;
-	    size = schema->typeLength[attrNum];
+	    	size = schema->typeLength[attrNum];
             char *s;
             s = (char *)malloc(size + 1);
             strncpy(s, attributeData, size);
@@ -737,7 +733,9 @@ extern RC setAttr (Record *record, Schema *schema, int attrNum, Value *value){
     offset_attr(schema, attrNum, &displacement);
 	
     data = record->data + displacement;
-
+	
+	char *s;
+    int length = schema->typeLength[attrNum];
      // Setting attribute values */
     switch(schema->dataTypes[attrNum])
     {
@@ -745,8 +743,6 @@ extern RC setAttr (Record *record, Schema *schema, int attrNum, Value *value){
            memcpy(data,&(value->v.intV),sizeof(int));
            break;
         case DT_STRING:
-            char *s;
-            int length = schema->typeLength[attrNum];
             s = (char *) malloc(length);
             s = value->v.stringV;
             memcpy(data,(s), length);
