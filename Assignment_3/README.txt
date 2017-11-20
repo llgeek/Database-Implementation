@@ -79,14 +79,15 @@
 
 
 15. extern int getRecordSize (Schema *schema);
-
-
+	this function returns the size in bytes of record for a given schema.
+  
+  
 16. extern Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes, int *typeLength, int keySize, int *keys);
-
-
+	this function will memory to the schema and schema data.
+  
 17. extern RC freeSchema (Schema *schema);
-
-
+ 	this function will free the memory allocated to schema and schema data.
+  
 18. extern RC createRecord (Record **record, Schema *schema);
     this function will allocate memory to record and record data.
 
