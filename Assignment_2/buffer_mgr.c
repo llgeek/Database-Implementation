@@ -356,7 +356,7 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const PageNumber
 	//assign the value for pages, with its pageNum and content
 	page->pageNum = pageNum;
 	page->data = malloc(sizeof(char) * PAGE_SIZE);
-	strcpy(page->data, mgmtData->frames[frameNum].pgdata->data);
+	memcpy(page->data, mgmtData->frames[frameNum].pgdata->data, PAGE_SIZE);
 
 	return RC_OK;
 
@@ -420,7 +420,7 @@ RC markDirty (BM_BufferPool *const bm, BM_PageHandle *const page) {
 	// 	mgmtData->frames[frameNum].is_dirty = false;
 	// }
 	mgmtData->frames[frameNum].is_dirty = true;	//mark the frame as dirty
-	strcpy(mgmtData->frames[frameNum].pgdata->data, page->data);
+	memcpy(mgmtData->frames[frameNum].pgdata->data, page->data, PAGE_SIZE);
 	mgmtData->frames[frameNum].used_time = TIMER;	//set used timer as current timer
 
 	return RC_OK;
