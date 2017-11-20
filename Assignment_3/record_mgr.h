@@ -21,6 +21,8 @@ extern RC closeTable (RM_TableData *rel);
 extern RC deleteTable (char *name);
 extern int getNumTuples (RM_TableData *rel);
 
+int getTotalTuples (RM_TableData *rel);
+
 // handling records in a table
 extern RC insertRecord (RM_TableData *rel, Record *record);
 extern RC deleteRecord (RM_TableData *rel, RID id);

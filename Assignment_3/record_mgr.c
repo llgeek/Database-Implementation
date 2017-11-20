@@ -20,15 +20,23 @@ Xiaolin hu
 ********************************************************/
 typedef struct RM_TableInfo {
 	BM_BufferPool *bm;
-	int numTuple; //number of tuples in the table //getNumTuples()
+	int validTuple; //number of valid tuples in the table //getNumTuples()
+	int totalTuple;		//number of total tuples, including invalid tuples
 } RM_TableInfo;
 
 
 
 typedef struct ScanHandle {
-	int currentPos;		//current position of the scanning in table
-	char *data;		//page data
+	int curPage;		//current page of the scanning in table
+	int curSlot;		//current slot number of the scanning in table
+	int numPage;		//total number of pages
+	int numSlot;		//total slots in one page
+	int recordSize;		//one record's size
+	int recordPerPage; 	//record per page
 	Expr *cond;		//scan condition
+	BM_PageHandle *pgdata;		//current page's data, used for fast lookup
+	BM_BufferPool *bm;			//buffer pool
+	RM_TableData *rel;		//table database pointer
 } ScanHandle;
 
 /**
@@ -205,8 +213,9 @@ RC openTable (RM_TableData *rel, char *name){
 	//initialize RM_TableInfo
 	RM_TableInfo *tableInfo = (RM_TableInfo *) malloc(sizeof(RM_TableInfo));
 
-	tableInfo -> bm = bm;
-	tableInfo -> numTuple = 0;
+	tableInfo->bm = bm;
+	tableInfo->validTuple = 0;
+	tableInfo->totalTuple = 0;
 
 	//assign mgmtData to RM_TableData
 	rel -> mgmtData = tableInfo;
@@ -318,7 +327,13 @@ RC deleteTable (char *name){
 int getNumTuples (RM_TableData *rel) {
 	//return the tuple numbers
 	RM_TableInfo* info = (RM_TableInfo *) rel-> mgmtData;
-	return info ->numTuple;
+	return info ->validTuple;
+}
+
+
+int getTotalTuples (RM_TableData *rel) {
+	RM_TableInfo* info = (RM_TableInfo *) rel->mgmtData;
+	return info->totalTuple;
 }
 
 
@@ -336,41 +351,67 @@ int getNumTuples (RM_TableData *rel) {
  * @param  record: the record to be inserted
  * @return        Error code
  */
+//note page num should start from 1, since page 0 stores the schema information!
 RC insertRecord (RM_TableData *rel, Record *record) {
+	//get buffer and file info according to rel
 	RM_TableInfo *rm = (RM_TableInfo *) rel->mgmtData;
 	BM_BufferPool *bm = rm->bm;
-	BM_FrameHandle *fh = (BM_FrameHandle *) bm->mgmtData;
-
+	//allocate a new page to store record
 	BM_PageHandle *page = (BM_PageHandle *) malloc(sizeof(BM_PageHandle));
 
-	int recordsize;
-	if ((recordsize = getRecordSize(rel->schema)) == -1)
+	int recordsize;		//store one record's size
+	if ((recordsize = getRecordSize(rel->schema)) == -1)		//error in getting schema's record size
 		return  RC_FILE_NOT_FOUND;
+	//I will use one int value to indicate whether this record is deleted or not.
 	recordsize += (sizeof(char) + sizeof(int));		//char for '\n', int for tombstone, marking dirty when record is deleted
 
-	int totaltuples = getNumTuples(rel);
+	//total records in existing table
+	////should return the total number of valid and invalid records
+	///because invalid record still comsumes the space in page
+	int totaltuples = getTotalTuples(rel);
 
-	int recordperpage = PAGE_SIZE / recordsize;
-	int pageNum = totaltuples / recordperpage + 1;
+	//how many records can be stored in one page, use unspanned records
+	int recordperpage = PAGE_SIZE / recordsize;	
+	
+	//the new pageNum will be used for insertion
+	int pageNum = totaltuples / recordperpage + 1;	//skip page 0, since it stores schema info
 
-	int slot = totaltuples * recordsize;
+	//offset from the start location of this page
+	int slot = 0;		
+	//last page has been exhausted, assigning a new page
+	if (totaltuples % recordperpage == 0) {
+		slot = 0;
+	} else {	//still can use the last page to insert the record
+		//offset equals the record number in this page times the record size
+		slot = (totaltuples % recordperpage)*recordsize;
+	}
 
+
+	//assigning value to the page
 	page->pageNum = pageNum;
-	fh->pgdata->pageNum = pageNum;
-	page->data = fh->pgdata->data;
+	//pin the page of pageNum
+	pinPage(bm, page, pageNum);
 
-	record->id.page = page->pageNum;
+	record->id.page = pageNum;
 	record->id.slot = slot;
+	
 
 	char * tempbuf = (char *) malloc(sizeof(recordsize));
 	*((int *) tempbuf) = 0;		//set the tombstone as 0, indicating it's undeleted
 	memcpy(tempbuf + sizeof(int), record->data, recordsize - sizeof(int) - sizeof(char));
-	*((char *) tempbuf + recordsize - sizeof(char)) = '\n';
+	*((char *) tempbuf + recordsize - sizeof(char)) = '\0';
 
+	//insert the record to the page offset the slot size
 	memcpy(page->data + slot, tempbuf, recordsize);
 
+	//mark the page is dirty, cache the modification and will not write back immediately
+	//write the page content back to the file
 	markDirty(bm, page);
-	rm->numTuple ++;
+	forcePage(bm, page);
+	unpinPage(bm, page);
+
+	rm->validTuple ++;
+	rm->totalTuple ++;
 
 	free(tempbuf);
 
@@ -378,35 +419,57 @@ RC insertRecord (RM_TableData *rel, Record *record) {
 }
 
 
-
+/**
+ * This funciton is used to delete one record according to the id info
+ * @param  rel relation database
+ * @param  id  record id to be deleted
+ * @return     error code
+ */
 RC deleteRecord (RM_TableData *rel, RID id) {
 	RM_TableInfo *rm = (RM_TableInfo *) rel->mgmtData;
 	BM_BufferPool *bm = rm->bm;
-	BM_FrameHandle *fh = (BM_FrameHandle *) bm->mgmtData;
 
 	BM_PageHandle *page = (BM_PageHandle *) malloc(sizeof(BM_PageHandle));
-	page->pageNum = fh->pgdata->pageNum;
-	page->data = fh->pgdata->data;
 
-	*((int *)(page->data) + id.slot) = 1;	
+	//get the page stores the record with RID id
+	pinPage(bm, page, id.page);
 
-	rm->numTuple -= 1;
+	//starting int stores the value indicating whether this record is valid
+	//1 indicates this record is invalid, 0 indicates valid
+	*((int *)(page->data) + id.slot) = 1;		
+
+	//mark the page is dirty, cache the modification and will not write back immediately
+	markDirty(bm, page);
+	unpinPage(bm, page);
+
+	rm->validTuple -= 1;
 
 	return RC_OK;
 }
 
 
+/**
+ * This function is used to update one record's data according to the given record
+ * @param  rel    relation database
+ * @param  record record used to update
+ * @return        error code
+ */
 RC updateRecord (RM_TableData *rel, Record *record) {
 	RM_TableInfo *rm = (RM_TableInfo *) rel->mgmtData;
 	BM_BufferPool *bm = rm->bm;
-	BM_FrameHandle *fh = (BM_FrameHandle *) bm->mgmtData;
 
 	BM_PageHandle *page = (BM_PageHandle *) malloc(sizeof(BM_PageHandle));
-	page->pageNum = fh->pgdata->pageNum;
-	page->data = fh->pgdata->data;
+
+	//pin page according to record's RID id info
+	pinPage(bm, page, record->id.page);
 
 	int recordsize = getRecordSize(rel->schema);
+	//update the record value
 	memcpy((page->data) + record->id.slot + sizeof(int), record->data, recordsize);
+
+	//mark the page is dirty, cache the modification and will not write back immediately
+	markDirty(bm, page);
+	unpinPage(bm, page);
 
 	return RC_OK;
 }
@@ -421,95 +484,148 @@ RC updateRecord (RM_TableData *rel, Record *record) {
 RC getRecord (RM_TableData *rel, RID id, Record *record) {
 	RM_TableInfo *rm = (RM_TableInfo *) rel->mgmtData;
 	BM_BufferPool *bm = rm->bm;
-	BM_FrameHandle *fh = (BM_FrameHandle *) bm->mgmtData;
 
 	BM_PageHandle *page = (BM_PageHandle *) malloc(sizeof(BM_PageHandle));
-	page->pageNum = fh->pgdata->pageNum;
-	page->data = fh->pgdata->data;
+
+	//pin page according to record's RID id info
+	pinPage(bm, page, id.page);
 
 	int recordsize = getRecordSize(rel->schema);
+
+	//check whether the given record is already deleted
+	if (*(int *)((page->data) + id.slot) == 1) {
+		printf("ERROR: Record to be retrived is invalid and has been deleted!\n");
+	}
+	//copy the record data
 	memcpy(record->data, (page->data) + id.slot + sizeof(int), recordsize);
 
+	//assigning RID info
 	record->id.slot = id.slot;
 	record->id.page = id.page;
+
+	unpinPage(bm, page);
 
 	return RC_OK;
 
 }
 
-
+/**
+ * This function is used to initialize a scan handler for database scanning
+ * @param  rel  	relation database
+ * @param  scan 	scan handler to be updated
+ * @param  cond 	scan condition
+ * @return     		error code
+ */
 RC startScan (RM_TableData *rel, RM_ScanHandle *scan, Expr *cond) {
 	RM_TableInfo * rm = (RM_TableInfo *) rel->mgmtData;
 	BM_BufferPool *bm = (BM_BufferPool *) rm->bm;
-	BM_FrameHandle *fh = (BM_FrameHandle *) bm->mgmtData;
-	BM_PageHandle *page = fh->pgdata;
+	BM_MgmtData *bmmgmt = (BM_MgmtData *) bm->mgmtData;
+
+	BM_PageHandle *pgdata = (BM_PageHandle *) malloc(sizeof(BM_PageHandle));
+	pinPage(bm, pgdata, 1);
 
 	ScanHandle *sh = (ScanHandle *) malloc (sizeof(ScanHandle));
-	sh->currentPos = 0;
-	sh->data = page->data;
+
+	int recordsize;		//store one record's size
+	if ((recordsize = getRecordSize(rel->schema)) == -1)		//error in getting schema's record size
+		return  RC_FILE_NOT_FOUND;
+	recordsize += (sizeof(char) + sizeof(int));		//char for '\n', int for tombstone, marking dirty when record is deleted
+
+	//how many records can be stored in one page, use unspanned records
+	int recordperpage = PAGE_SIZE / recordsize;	
+
+
+	sh->curPage = 1;		//current page of the scanning in table, starting from 1
+	sh->curSlot = 0;		//current slot number of the scanning in table
+	sh->numPage = bmmgmt->fileHandle->totalNumPages;		//total number of pages
+	sh->numSlot = recordperpage * recordsize;		//total slots in one page
+	sh->recordSize = recordsize;	//one record size
+	sh->recordPerPage = recordperpage;	//record per page
 	sh->cond = cond;
+	sh->pgdata = pgdata;
+	sh->bm = bm;
+	sh->rel = rel;
+
+	unpinPage(bm, pgdata);
 
 	scan->rel = rel;
 	scan->mgmtData = sh;
 
+
+
 	return RC_OK;
 }
 
 
+/**
+ * this function is used to iterate the database to find all tuples satisfying the scanning condition
+ * @param  scan   	scan handler
+ * @param  record  	returning record, directly update it
+ * @return        	error code
+ */
 RC next (RM_ScanHandle *scan, Record *record) {
-	Record *temp = (Record *)malloc(sizeof(Record));
-    temp->data = (char *)malloc(sizeof(char));
-    RM_TableData *t = (RM_TableData *)scan->rel;
-    Schema *sc = (Schema *) t->schema;
-    ScanHandle *sh = (ScanHandle *)scan->mgmtData;
-    Expr *cond = (Expr *)sh->cond;
-    int pos = sh->currentPos;
-    int recordSize = getRecordSize(sc);
-    int tuples = getNumTuples(t);
+	ScanHandle *sh = (ScanHandle *) scan->mgmtData;		//casting
 
-    RID id;
-    id.page = 1;
 
-    Value *result = (Value *) malloc(sizeof(Value));
-    
-    char *data = (char *)malloc(sizeof(char));
-    data = (char *)sh->data;
+	//no more tuples, scan is complete
+	if (sh->curPage == sh->numPage-1 && sh->curSlot == sh->numSlot) {
+		return RC_RM_NO_MORE_TUPLES;
+	} 
+	//scan handler reach the end of one page, move to the next page
+	if (sh->curSlot == sh->numSlot) {
+		sh->curPage ++;
+		sh->curSlot = 0;
+		pinPage(sh->bm, sh->pgdata, sh->curPage);
+		unpinPage(sh->bm, sh->pgdata);
+	}
 
-    if(cond == NULL) {
-    	if(pos >= ((recordSize+sizeof(int) + sizeof(char)) * tuples))
-        	return RC_RM_NO_MORE_TUPLES;
-        
-        record->data = (char *)(data + pos + sizeof(int));
-        pos = pos + recordSize + sizeof(int) + sizeof(char);
-        sh->currentPos = pos;
-        scan->mgmtData = sh;
-    } else {
-        while(1)
-        {
-            if(pos >= ((recordSize+sizeof(int) + sizeof(char)) * tuples))
-                return RC_RM_NO_MORE_TUPLES;
-            
-            id.slot = pos;
-            getRecord(t, id, temp);
-            evalExpr(temp, sc, cond, &result);
-            if(result->v.boolV)
-            {
-                *(record) = *(temp);
-                pos = pos + recordSize + sizeof(int) + sizeof(char);
-                sh->currentPos = pos;
-                scan->mgmtData = sh;
-                break;
-            }
-            
-            pos = pos + recordSize + sizeof(int) + sizeof(char);
-        }
-    }
-    return RC_OK;
+	//current record is marked as deleted, then skip this record
+	if (*(int *)(sh->pgdata->data + sh->curSlot) == 1) {
+		sh->curSlot += sh->recordSize;
+		next(scan, record);
+	}
+	//condition is NULL, returning all the tuples back
+	if (sh->cond == NULL) {
+		record->id.page = sh->curPage;
+		record->id.slot = sh->curSlot;
+		//assign the record data value
+		memcpy(record->data, sh->pgdata->data + sh->curSlot + sizeof(int), sh->recordSize - sizeof(int));
+		sh->curSlot += sh->recordSize;
+		scan->mgmtData = sh;
+		return RC_OK;
+	} 
+	//scanning with condition, need to check the condition
+	else {
+		record->id.page = sh->curPage;
+		record->id.slot = sh->curSlot;
+		//assign the record data value
+		memcpy(record->data, sh->pgdata->data + sh->curSlot + sizeof(int), sh->recordSize - sizeof(int));
+		sh->curSlot += sh->recordSize;
+		scan->mgmtData = sh;
+
+		Value *result = (Value *) malloc(sizeof(Value));
+		//check whether this record satisfy the scan condition
+		evalExpr(record, sh->rel->schema, sh->cond, &result);
+		//if statisfy, directly return this record
+		if (result->v.boolV)
+			return RC_OK;
+		//otherwise, iterate the next untill finding a one or till the end
+		else
+			next(scan, record);
+	}
+	return RC_OK;
 }
 
 
+
+/**
+ * close the scan handler
+ * @param  scan  scan handler to be closed
+ * @return      error code
+ */
 RC closeScan (RM_ScanHandle *scan) {
 	ScanHandle *sh = (ScanHandle *) scan->mgmtData;
+	free(sh->pgdata);
 	free(sh);
 	return RC_OK;
 }
@@ -596,8 +712,8 @@ Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes, int *t
 
 	//assigning values
 	for (int i = 0; i < numAttr; i++) {
-		schema->attrNames[i] = (char *) malloc(sizeof(char)*5);
-		memset(schema->attrNames[i], '\0', 5);
+		schema->attrNames[i] = (char *) malloc(sizeof(char)*10);
+		memset(schema->attrNames[i], '\0', 10);
 		strcpy(schema->attrNames[i], attrNames[i]);
 
 		schema->dataTypes[i] = dataTypes[i];
