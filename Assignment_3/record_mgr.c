@@ -131,11 +131,11 @@ RC createTable (char *name, Schema *schema){
 	offset += sizeof(int);
 
 	//set attriNames
-	int attrLens; //length of an attribute
+	size_t attrLens; //length of an attribute
 	for (int i = 0; i < schema->numAttr; i++) {
 		attrLens = strlen(schema->attrNames[i])+1;	//get the length of an attribute
 		memcpy(newpage+offset, schema->attrNames[i], attrLens);
-		*(newpage + offset + attrLens) = '\0';		//set NULL terminator, in case
+		//*(newpage + offset + attrLens) = '\0';		//set NULL terminator, in case
 		//strcpy(newpage+offset, schema->attrNames[i]);
 		offset += attrLens;
 	}
@@ -697,38 +697,49 @@ int getRecordSize (Schema *schema){
  *
  */
 
+//Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes, int *typeLength, int keySize, int *keys){
+//
+//	Schema *schema = (Schema *)malloc(sizeof(Schema)); 
+//
+//	//assigning value to the schema
+//	schema->numAttr = numAttr;
+//
+//	//to keep the parameters safe, we should malloc new space instead of assigning parameters' pointer here
+//	//allocating space
+//	schema->attrNames = (char **)malloc(sizeof(char)*numAttr);
+//	schema->dataTypes = (DataType *) malloc(sizeof(DataType)*numAttr);
+//	schema->typeLength = (int *) malloc(sizeof(int)*numAttr);
+//
+//	//assigning values
+//	for (int i = 0; i < numAttr; i++) {
+//		schema->attrNames[i] = (char *) malloc(sizeof(char)*10);
+//		memset(schema->attrNames[i], '\0', 10);
+//		strcpy(schema->attrNames[i], attrNames[i]);
+//
+//		schema->dataTypes[i] = dataTypes[i];
+//		schema->typeLength[i] = typeLength[i];
+//	}
+//	
+//	schema->keySize = keySize;
+//
+//	schema->keyAttrs = (int *) malloc(sizeof(int)*keySize);
+//	for (int i = 0; i < keySize; i++)
+//		schema->keyAttrs[i] = keys[i];
+//
+//	return schema;
+//
+//}//*createSchema
+
 Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes, int *typeLength, int keySize, int *keys){
-
-	Schema *schema = (Schema *)malloc(sizeof(Schema)); 
-
-	//assigning value to the schema
-	schema->numAttr = numAttr;
-
-	//to keep the parameters safe, we should malloc new space instead of assigning parameters' pointer here
-	//allocating space
-	schema->attrNames = (char **)malloc(sizeof(char)*numAttr);
-	schema->dataTypes = (DataType *) malloc(sizeof(DataType)*numAttr);
-	schema->typeLength = (int *) malloc(sizeof(int)*numAttr);
-
-	//assigning values
-	for (int i = 0; i < numAttr; i++) {
-		schema->attrNames[i] = (char *) malloc(sizeof(char)*10);
-		memset(schema->attrNames[i], '\0', 10);
-		strcpy(schema->attrNames[i], attrNames[i]);
-
-		schema->dataTypes[i] = dataTypes[i];
-		schema->typeLength[i] = typeLength[i];
-	}
-	
-	schema->keySize = keySize;
-
-	schema->keyAttrs = (int *) malloc(sizeof(int)*keySize);
-	for (int i = 0; i < keySize; i++)
-		schema->keyAttrs[i] = keys[i];
-
-	return schema;
-
-}//*createSchema
+    Schema *schema = (Schema *)malloc(sizeof(Schema));
+    schema->numAttr = numAttr;
+    schema->attrNames = attrNames;
+    schema->dataTypes = dataTypes;
+    schema->typeLength = typeLength;
+    schema->keySize = keySize;
+    schema->keyAttrs = keys;
+    return schema;
+}
 
 
 /*
